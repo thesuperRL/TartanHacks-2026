@@ -12,11 +12,30 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
-# Install dependencies if needed
-if [ ! -f "venv/.installed" ]; then
-    echo "Installing dependencies..."
-    pip install -r requirements.txt
-    touch venv/.installed
+# Upgrade pip first
+echo "Upgrading pip..."
+pip install --upgrade pip --quiet
+
+# Check if Flask is installed, if not install all dependencies
+echo "Checking dependencies..."
+if ! python -c "import flask" 2>/dev/null; then
+    echo "Installing dependencies from requirements.txt..."
+    pip install -r requirements.txt --upgrade
+    if [ $? -eq 0 ]; then
+        touch venv/.installed
+        echo "✓ Dependencies installed successfully"
+    else
+        echo "✗ Error installing dependencies. Please check requirements.txt"
+        exit 1
+    fi
+else
+    # Always upgrade key packages for Python 3.13 compatibility
+    echo "Upgrading packages for Python 3.13 compatibility..."
+    pip install --upgrade "feedparser>=6.0.11" "openai>=1.12.0" 2>/dev/null || {
+        pip install --upgrade feedparser
+        pip install --upgrade openai
+    }
+    echo "✓ Dependencies check complete"
 fi
 
 # Check for .env file
@@ -27,5 +46,9 @@ if [ ! -f ".env" ]; then
 fi
 
 # Run the Flask app
-echo "Starting backend server on http://localhost:5000"
+# Using port 5001 to avoid conflict with macOS AirPlay Receiver on port 5000
+echo ""
+echo "Starting backend server on http://localhost:5001"
+echo "Note: Using port 5001 to avoid macOS AirPlay Receiver conflict"
+echo ""
 python app.py

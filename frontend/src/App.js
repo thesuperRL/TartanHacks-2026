@@ -5,7 +5,11 @@ import PortfolioOverlay from './components/PortfolioOverlay';
 import CategorySelector from './components/CategorySelector';
 import './App.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+
+// Debug: Log the API URL being used
+console.log('API Base URL:', API_BASE_URL);
+console.log('Google Maps API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Set' : 'Not set');
 
 function App() {
   const [articles, setArticles] = useState([]);

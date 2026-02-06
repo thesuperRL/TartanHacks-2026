@@ -26,22 +26,30 @@ export const loadGoogleMaps = () => {
 
     // Create loading promise
     window.googleMapsLoading = new Promise((resolveLoading, rejectLoading) => {
-      // Create script element
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-
-      script.onload = () => {
+      // Create a unique callback name
+      const callbackName = `googleMapsCallback_${Date.now()}`;
+      
+      // Set up the callback
+      window[callbackName] = () => {
         if (window.google && window.google.maps) {
           resolveLoading(window.google.maps);
+          // Clean up
+          delete window[callbackName];
         } else {
           rejectLoading(new Error('Google Maps API failed to load'));
+          delete window[callbackName];
         }
       };
 
+      // Create script element with callback for best-practice loading
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}&loading=async`;
+      script.async = true;
+      script.defer = true;
+
       script.onerror = () => {
         rejectLoading(new Error('Failed to load Google Maps API script'));
+        delete window[callbackName];
       };
 
       // Add script to document

@@ -1,10 +1,17 @@
 import requests
 from bs4 import BeautifulSoup
 import feedparser
-from newspaper import Article
 import time
 from typing import List, Dict
 import random
+
+# Try to import newspaper, but make it optional
+try:
+    from newspaper import Article
+    NEWSPAPER_AVAILABLE = True
+except ImportError:
+    NEWSPAPER_AVAILABLE = False
+    print("Warning: newspaper3k not available. Article summaries will be limited to RSS feed data.")
 
 class NewsScraper:
     def __init__(self):
@@ -36,17 +43,30 @@ class NewsScraper:
             feed = feedparser.parse(feed_url)
             for entry in feed.entries[:10]:  # Limit to 10 per feed
                 try:
-                    article = Article(entry.link)
-                    article.download()
-                    article.parse()
+                    # Use newspaper3k if available for better article extraction
+                    if NEWSPAPER_AVAILABLE:
+                        try:
+                            article = Article(entry.link)
+                            article.download()
+                            article.parse()
+                            summary = article.summary if article.summary else entry.get('summary', '')
+                            full_text = article.text[:1000] if article.text else ''
+                        except Exception as e:
+                            # Fallback to RSS data if newspaper fails
+                            summary = entry.get('summary', '')
+                            full_text = ''
+                    else:
+                        # Use RSS feed data directly
+                        summary = entry.get('summary', '')
+                        full_text = ''
                     
                     articles.append({
                         'title': entry.title,
                         'url': entry.link,
-                        'summary': article.summary if article.summary else entry.get('summary', ''),
+                        'summary': summary,
                         'published': entry.get('published', ''),
                         'source': feed.feed.get('title', 'Unknown'),
-                        'full_text': article.text[:1000] if article.text else '',  # First 1000 chars
+                        'full_text': full_text,
                     })
                     time.sleep(0.5)  # Be respectful to servers
                 except Exception as e:

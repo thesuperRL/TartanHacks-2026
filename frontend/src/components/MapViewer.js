@@ -14,8 +14,10 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
 
   // Load Google Maps API
   useEffect(() => {
+    console.log('Loading Google Maps API...');
     loadGoogleMaps()
       .then((maps) => {
+        console.log('Google Maps API loaded successfully');
         setGoogleMaps(maps);
         setLoadingError(null);
       })
@@ -31,6 +33,9 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
                 Create a .env file in the frontend directory and add:<br/>
                 REACT_APP_GOOGLE_MAPS_API_KEY=your_api_key_here
               </p>
+              <p style="font-size: 11px; color: #888; margin-top: 10px;">
+                Current API Key: ${process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Set (but may be invalid)' : 'Not set'}
+              </p>
             </div>
           `;
         }
@@ -39,10 +44,40 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
 
   // Initialize map once Google Maps is loaded
   useEffect(() => {
-    if (!googleMaps || !mapRef.current) return;
+    if (!googleMaps || !mapRef.current) {
+      if (!googleMaps) console.log('Waiting for Google Maps to load...');
+      if (!mapRef.current) console.log('Waiting for map container...');
+      return;
+    }
 
-    // Initialize map
-    const mapInstance = new googleMaps.Map(mapRef.current, {
+    console.log('Initializing Google Map...');
+    
+    // Ensure map container has dimensions
+    const container = mapRef.current;
+    const parent = container.parentElement;
+    
+    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+      console.warn('Map container has no dimensions');
+      console.log('Container:', container.offsetWidth, 'x', container.offsetHeight);
+      console.log('Parent:', parent?.offsetWidth, 'x', parent?.offsetHeight);
+      
+      // Force dimensions from parent
+      if (parent) {
+        const parentWidth = parent.offsetWidth || parent.clientWidth || window.innerWidth;
+        const parentHeight = parent.offsetHeight || parent.clientHeight || window.innerHeight;
+        container.style.width = `${parentWidth}px`;
+        container.style.height = `${parentHeight}px`;
+        console.log('Set container dimensions to:', parentWidth, 'x', parentHeight);
+      } else {
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.minHeight = '400px';
+      }
+    }
+
+    try {
+      // Initialize map
+      const mapInstance = new googleMaps.Map(mapRef.current, {
       center: { lat: 20, lng: 0 },
       zoom: 2,
       styles: [
@@ -64,18 +99,41 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       ]
     });
 
-    // Initialize street view
-    const streetViewInstance = new googleMaps.StreetViewPanorama(streetViewRef.current, {
-      position: { lat: 40.7128, lng: -74.0060 },
-      pov: { heading: 0, pitch: 0 },
-      visible: false
-    });
+      console.log('Map initialized successfully');
+      console.log('Map container dimensions:', mapRef.current.offsetWidth, 'x', mapRef.current.offsetHeight);
+      
+      // Initialize street view
+      const streetViewInstance = new googleMaps.StreetViewPanorama(streetViewRef.current, {
+        position: { lat: 40.7128, lng: -74.0060 },
+        pov: { heading: 0, pitch: 0 },
+        visible: false
+      });
 
-    setMap(mapInstance);
-    setStreetView(streetViewInstance);
+      setMap(mapInstance);
+      setStreetView(streetViewInstance);
 
-    // Link street view to map
-    mapInstance.setStreetView(streetViewInstance);
+      // Link street view to map
+      mapInstance.setStreetView(streetViewInstance);
+      
+      // Trigger a resize event to ensure map renders properly
+      const triggerResize = () => {
+        if (window.google && window.google.maps && window.google.maps.event && mapInstance) {
+          window.google.maps.event.trigger(mapInstance, 'resize');
+          console.log('Map resize triggered');
+        }
+      };
+      
+      // Trigger resize after a short delay to ensure DOM is ready
+      setTimeout(triggerResize, 100);
+      setTimeout(triggerResize, 500);
+      
+      // Also trigger on window resize
+      const resizeHandler = () => triggerResize();
+      window.addEventListener('resize', resizeHandler);
+      
+      return () => {
+        window.removeEventListener('resize', resizeHandler);
+      };
 
     // Add double-click to enter street view
     mapInstance.addListener('dblclick', (e) => {
@@ -95,11 +153,25 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
     };
     mapRef.current.appendChild(exitButton);
 
-    return () => {
-      if (exitButton.parentNode) {
-        exitButton.parentNode.removeChild(exitButton);
+      return () => {
+        if (exitButton.parentNode) {
+          exitButton.parentNode.removeChild(exitButton);
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing map:', error);
+      if (mapRef.current) {
+        mapRef.current.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #2a2a2a; color: #fff; flex-direction: column; padding: 20px; text-align: center;">
+            <h2>⚠️ Map Initialization Error</h2>
+            <p>${error.message}</p>
+            <p style="font-size: 12px; color: #aaa; margin-top: 10px;">
+              Please check your Google Maps API key and ensure it's valid.
+            </p>
+          </div>
+        `;
       }
-    };
+    }
   }, [googleMaps]);
 
   useEffect(() => {
@@ -174,9 +246,64 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
   }, [map, articles, selectedArticle, googleMaps, streetView, isStreetView, onArticleSelect]);
 
   return (
-    <div className="map-viewer">
-      <div ref={mapRef} className="map-container" />
-      <div ref={streetViewRef} className="street-view-container" />
+    <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {!googleMaps && !loadingError && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          background: '#2a2a2a',
+          color: '#fff',
+          flexDirection: 'column',
+          position: 'absolute',
+          width: '100%',
+          zIndex: 1
+        }}>
+          <p>Loading map...</p>
+        </div>
+      )}
+      {loadingError && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          background: '#2a2a2a',
+          color: '#fff',
+          flexDirection: 'column',
+          position: 'absolute',
+          width: '100%',
+          zIndex: 1
+        }}>
+          <p>Error: {loadingError}</p>
+        </div>
+      )}
+      <div 
+        ref={mapRef} 
+        className="google-map-container" 
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          minHeight: '400px',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          zIndex: 0
+        }} 
+      />
+      <div 
+        ref={streetViewRef} 
+        className="street-view-container" 
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          zIndex: 0
+        }} 
+      />
       {isStreetView && (
         <div className="street-view-overlay">
           <p>Street View Mode - Double click on map to exit</p>
