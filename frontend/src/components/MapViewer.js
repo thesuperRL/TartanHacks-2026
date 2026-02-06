@@ -11,6 +11,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
   const [markers, setMarkers] = useState([]);
   const [googleMaps, setGoogleMaps] = useState(null);
   const [loadingError, setLoadingError] = useState(null);
+  const [streetViewLoaded, setStreetViewLoaded] = useState(false);
 
   // Load Google Maps API
   useEffect(() => {
@@ -49,12 +50,33 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
         const position = { lat, lng };
         const streetViewService = new googleMaps.StreetViewService();
         streetViewService.getPanorama({ location: position, radius: 50 }, (data, status) => {
-          if (status === 'OK') {
-            console.log('Street view available, activating...');
-            streetView.setPosition(position);
+          if (status === 'OK' && data && data.location) {
+            console.log('Street view available, activating...', data.location);
+            // Use the actual panorama location from the service
+            const panoramaLocation = data.location.latLng;
+            
+            // Ensure container is visible
+            if (streetViewRef.current) {
+              streetViewRef.current.style.display = 'block';
+              streetViewRef.current.style.visibility = 'visible';
+              streetViewRef.current.style.zIndex = '10';
+            }
+            
+            // Reset loaded state
+            setStreetViewLoaded(false);
+            
+            // Set position and make visible
+            streetView.setPosition(panoramaLocation);
             streetView.setPov({ heading: 270, pitch: 0 });
             streetView.setVisible(true);
             setIsStreetView(true);
+            
+            // Trigger resize
+            setTimeout(() => {
+              if (window.google && window.google.maps && window.google.maps.event) {
+                window.google.maps.event.trigger(streetView, 'resize');
+              }
+            }, 300);
           } else {
             console.log('Street view not available at this location:', status);
             alert('Street View imagery is not available at this location. Try clicking on a road or street.');
@@ -139,8 +161,13 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
         visible: false,
         enableCloseButton: false, // We'll handle exit with our own button
         addressControl: false,
-        linksControl: true,
-        panControl: true
+        linksControl: true, // Enable navigation links
+        panControl: true, // Enable pan controls
+        zoomControl: true, // Enable zoom controls
+        fullscreenControl: false, // We'll handle fullscreen ourselves if needed
+        scrollwheel: true, // Enable mouse wheel zoom
+        clickToGo: true, // Enable clicking on arrows to navigate
+        disableDefaultUI: false // Keep default UI for navigation
       });
       
       console.log('Street view initialized on container:', streetViewRef.current);
@@ -196,6 +223,9 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
             streetViewRef.current.style.zIndex = '10';
           }
           
+          // Reset loaded state when entering new street view
+          setStreetViewLoaded(false);
+          
           // Set position and make visible
           streetViewInstance.setPosition(panoramaLocation);
           streetViewInstance.setPov({ heading: 270, pitch: 0 });
@@ -230,16 +260,29 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       }
     });
     
-    // Track if street view has loaded successfully
-    let streetViewLoaded = false;
-    streetViewInstance.addListener('pano_changed', () => {
-      streetViewLoaded = true;
-      console.log('Street view panorama loaded, pano ID:', streetViewInstance.getPano());
-    });
-    
     // Listen for when street view is ready
     streetViewInstance.addListener('pano_changed', () => {
-      console.log('Street view panorama changed, pano ID:', streetViewInstance.getPano());
+      const panoId = streetViewInstance.getPano();
+      console.log('Street view panorama changed, pano ID:', panoId);
+      // Mark as loaded when we have a valid panorama
+      if (panoId) {
+        // Give it a moment for tiles to actually render
+        setTimeout(() => {
+          setStreetViewLoaded(true);
+        }, 1000);
+      }
+    });
+    
+    // Listen for when street view tiles have loaded
+    streetViewInstance.addListener('status_changed', () => {
+      const status = streetViewInstance.getStatus();
+      console.log('Street view status changed:', status);
+      if (status === 'OK') {
+        // Give it a moment for tiles to actually render
+        setTimeout(() => {
+          setStreetViewLoaded(true);
+        }, 1000);
+      }
     });
     
     // Listen for street view visibility changes
@@ -247,6 +290,9 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       const isVisible = streetViewInstance.getVisible();
       console.log('Street view visibility changed:', isVisible);
       setIsStreetView(isVisible);
+      if (!isVisible) {
+        setStreetViewLoaded(false); // Reset when hidden
+      }
       if (streetViewRef.current) {
         if (isVisible) {
           streetViewRef.current.style.display = 'block';
@@ -363,13 +409,35 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
             btn.onclick = () => {
               const streetViewService = new googleMaps.StreetViewService();
               streetViewService.getPanorama({ location: position, radius: 50 }, (data, status) => {
-                if (status === 'OK') {
-                  console.log('Street view available, activating from marker...');
-                  streetView.setPosition(position);
+                if (status === 'OK' && data && data.location) {
+                  console.log('Street view available, activating from marker...', data.location);
+                  
+                  // Use the actual panorama location from the service
+                  const panoramaLocation = data.location.latLng;
+                  
+                  // Ensure container is visible
+                  if (streetViewRef.current) {
+                    streetViewRef.current.style.display = 'block';
+                    streetViewRef.current.style.visibility = 'visible';
+                    streetViewRef.current.style.zIndex = '10';
+                  }
+                  
+                  // Reset loaded state
+                  setStreetViewLoaded(false);
+                  
+                  // Set position and make visible
+                  streetView.setPosition(panoramaLocation);
                   streetView.setPov({ heading: 270, pitch: 0 });
                   streetView.setVisible(true);
                   setIsStreetView(true);
                   infoWindow.close();
+                  
+                  // Trigger resize
+                  setTimeout(() => {
+                    if (window.google && window.google.maps && window.google.maps.event) {
+                      window.google.maps.event.trigger(streetView, 'resize');
+                    }
+                  }, 300);
                 } else {
                   alert('Street View imagery is not available at this location.');
                 }
@@ -492,6 +560,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
                 streetView.setVisible(false);
               }
               setIsStreetView(false);
+              setStreetViewLoaded(false); // Reset loaded state
               // Force hide the container
               if (streetViewRef.current) {
                 streetViewRef.current.style.display = 'none';
@@ -518,30 +587,30 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           >
             Exit Street View
           </button>
-          <div className="street-view-overlay" style={{
-            position: 'absolute',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.8)',
-            color: 'white',
-            padding: '15px 25px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            pointerEvents: 'none',
-            textAlign: 'center',
-            maxWidth: '500px'
-          }}>
-            <p style={{ margin: '0 0 8px 0', fontWeight: 500 }}>
-              Street View Mode
-            </p>
-            <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
-              {streetView && streetView.getPano() 
-                ? 'If you see a black screen, Google is rate-limiting requests (429 error). Wait a moment or click "Exit Street View" to return to the map.'
-                : 'Loading Street View...'}
-            </p>
-          </div>
+          {!streetViewLoaded && (
+            <div className="street-view-overlay" style={{
+              position: 'absolute',
+              top: '20px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 9999,
+              background: 'rgba(0, 0, 0, 0.8)',
+              color: 'white',
+              padding: '15px 25px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              pointerEvents: 'none',
+              textAlign: 'center',
+              maxWidth: '500px'
+            }}>
+              <p style={{ margin: '0 0 8px 0', fontWeight: 500 }}>
+                Street View Mode
+              </p>
+              <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
+                Loading Street View...
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>
