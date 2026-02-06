@@ -1,0 +1,206 @@
+.portfolio-overlay {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  width: 350px;
+  background: #2a2a2a;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  border: 2px solid #3a3a3a;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+}
+
+.portfolio-toggle {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  padding: 12px 20px;
+  background: #4a9eff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 1000;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.portfolio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 2px solid #3a3a3a;
+}
+
+.portfolio-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.portfolio-content {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.add-stock {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.add-stock input {
+  flex: 1;
+  padding: 10px;
+  background: #333;
+  border: 2px solid #4a4a4a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.add-stock input:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.add-stock button {
+  padding: 10px 16px;
+  background: #4a9eff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.add-stock button:hover {
+  background: #3a8eef;
+}
+
+.stocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stock-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #333;
+  border-radius: 8px;
+  border: 1px solid #4a4a4a;
+  transition: all 0.2s;
+}
+
+.stock-item:hover {
+  background: #3a3a3a;
+  border-color: #5a5a5a;
+}
+
+.stock-info {
+  flex: 1;
+}
+
+.stock-symbol {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.stock-name {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.stock-price {
+  text-align: right;
+  margin-right: 12px;
+}
+
+.price {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.change {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.change.positive {
+  color: #4ade80;
+}
+
+.change.negative {
+  color: #f87171;
+}
+
+.remove-stock {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.remove-stock:hover {
+  background: #4a4a4a;
+  color: #fff;
+}
+
+.empty-portfolio {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+}
+
+.empty-portfolio p {
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .portfolio-overlay {
+    width: calc(100% - 40px);
+    right: 20px;
+    left: 20px;
+  }
+}

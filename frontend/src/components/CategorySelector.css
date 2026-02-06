@@ -1,0 +1,27 @@
+.category-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.category-button {
+  padding: 8px 16px;
+  background: #3a3a3a;
+  color: #fff;
+  border: 2px solid #4a4a4a;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.category-button:hover {
+  background: #4a4a4a;
+  border-color: #5a5a5a;
+}
+
+.category-button.active {
+  background: #4a9eff;
+  border-color: #4a9eff;
+  color: white;
+}
