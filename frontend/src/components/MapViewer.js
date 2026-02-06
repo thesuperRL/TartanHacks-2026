@@ -266,10 +266,15 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       console.log('Street view panorama changed, pano ID:', panoId);
       // Mark as loaded when we have a valid panorama
       if (panoId) {
-        // Give it a moment for tiles to actually render
-        setTimeout(() => {
-          setStreetViewLoaded(true);
-        }, 1000);
+        // Check if tiles are actually loaded by checking the status
+        const status = streetViewInstance.getStatus();
+        if (status === 'OK') {
+          // Give it a shorter moment for tiles to actually render
+          setTimeout(() => {
+            console.log('Setting street view as loaded');
+            setStreetViewLoaded(true);
+          }, 500);
+        }
       }
     });
     
@@ -278,10 +283,14 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       const status = streetViewInstance.getStatus();
       console.log('Street view status changed:', status);
       if (status === 'OK') {
-        // Give it a moment for tiles to actually render
-        setTimeout(() => {
-          setStreetViewLoaded(true);
-        }, 1000);
+        const panoId = streetViewInstance.getPano();
+        if (panoId) {
+          // Give it a moment for tiles to actually render
+          setTimeout(() => {
+            console.log('Setting street view as loaded from status change');
+            setStreetViewLoaded(true);
+          }, 500);
+        }
       }
     });
     
@@ -525,7 +534,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           overflow: 'hidden'
         }} 
       />
-      {isStreetView && (
+      {isStreetView && !streetViewLoaded && (
         <div style={{
           position: 'absolute',
           top: '50%',
@@ -541,7 +550,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           maxWidth: '400px'
         }}>
           <p style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 500 }}>
-            {streetView && streetView.getPano() ? 'Street View Loaded' : 'Loading Street View...'}
+            Loading Street View...
           </p>
           <p style={{ fontSize: '12px', margin: '0', opacity: 0.9, lineHeight: '1.5' }}>
             If you see a black screen, Google may be rate-limiting requests (429 error).
