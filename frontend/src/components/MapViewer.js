@@ -80,23 +80,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       const mapInstance = new googleMaps.Map(mapRef.current, {
       center: { lat: 20, lng: 0 },
       zoom: 2,
-      styles: [
-        {
-          featureType: 'all',
-          elementType: 'geometry',
-          stylers: [{ color: '#242424' }]
-        },
-        {
-          featureType: 'all',
-          elementType: 'labels.text.stroke',
-          stylers: [{ color: '#000000' }]
-        },
-        {
-          featureType: 'all',
-          elementType: 'labels.text.fill',
-          stylers: [{ color: '#ffffff' }]
-        }
-      ]
+      // Use default map style - custom dark styles were hiding map tiles
+      // If you want dark mode, use mapTypeId: 'satellite' or apply styles more carefully
     });
 
       console.log('Map initialized successfully');
@@ -246,7 +231,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
   }, [map, articles, selectedArticle, googleMaps, streetView, isStreetView, onArticleSelect]);
 
   return (
-    <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>
       {!googleMaps && !loadingError && (
         <div style={{
           display: 'flex',
@@ -258,7 +243,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           flexDirection: 'column',
           position: 'absolute',
           width: '100%',
-          zIndex: 1
+          zIndex: 10
         }}>
           <p>Loading map...</p>
         </div>
@@ -274,7 +259,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           flexDirection: 'column',
           position: 'absolute',
           width: '100%',
-          zIndex: 1
+          zIndex: 10
         }}>
           <p>Error: {loadingError}</p>
         </div>
@@ -289,7 +274,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           position: 'absolute',
           top: 0,
           left: 0,
-          zIndex: 0
+          zIndex: 2,
+          display: googleMaps ? 'block' : 'none'
         }} 
       />
       <div 
@@ -301,7 +287,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           position: 'absolute',
           top: 0,
           left: 0,
-          zIndex: 0
+          zIndex: isStreetView ? 3 : 0,
+          visibility: isStreetView ? 'visible' : 'hidden'
         }} 
       />
       {isStreetView && (

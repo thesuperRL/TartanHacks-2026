@@ -6,14 +6,23 @@
   display: block;
 }
 
-.google-map-container,
-.street-view-container {
+.google-map-container {
   width: 100% !important;
   height: 100% !important;
   position: absolute !important;
   top: 0;
   left: 0;
   min-height: 400px;
+  z-index: 1;
+}
+
+.street-view-container {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  z-index: 2;
 }
 
 .exit-street-view {
