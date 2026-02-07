@@ -5,7 +5,7 @@ An interactive news viewer that allows users to explore news articles from aroun
 ## Features
 
 ### Frontend
-- **Interactive Map Viewer**: Google Maps integration with street view support
+- **Interactive Map Viewer**: Mapbox integration with interactive map and markers
 - **News Pins**: Visual markers on the map showing article locations
 - **Popular Articles List**: Blurred article titles that reveal when clicked
 - **Portfolio Overlay**: Stock tracking interface for financial mode
@@ -22,7 +22,7 @@ An interactive news viewer that allows users to explore news articles from aroun
 ### Prerequisites
 - Python 3.8+
 - Node.js 16+
-- Google Maps API key
+- Mapbox access token
 - OpenAI API key (optional, but recommended for location detection)
 
 ### Backend Setup
@@ -73,14 +73,14 @@ npm install
 # Create .env file in frontend directory
 cat > .env << EOF
 REACT_APP_API_URL=http://localhost:5001/api
-REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+REACT_APP_MAPBOX_ACCESS_TOKEN=your_mapbox_access_token_here
 EOF
-# Edit .env and add your Google Maps API key
+# Edit .env and add your Mapbox access token
 ```
 
-   - Get a Google Maps API key from [Google Cloud Console](https://console.cloud.google.com/google/maps-apis)
-   - Enable "Maps JavaScript API" and optionally "Street View Static API"
-   - Replace `your_google_maps_api_key_here` with your actual key
+   - Get a free Mapbox access token from [Mapbox Account](https://account.mapbox.com/access-tokens/)
+   - Create a free account if you don't have one
+   - Replace `your_mapbox_access_token_here` with your actual access token
 
 5. Start the development server:
 ```bash
@@ -93,7 +93,7 @@ The frontend will run on `http://localhost:3000`
 
 1. **Refresh News**: Click the "Refresh News" button to scrape latest articles
 2. **Explore Map**: Click on pins to see article details
-3. **Street View**: Double-click on the map to enter street view mode
+3. **Explore Locations**: Click on map markers to see article details and locations
 4. **View Articles**: Click on blurred articles in the sidebar to reveal them
 5. **Financial Mode**: Switch to Financial category to see portfolio overlay
 6. **Add Stocks**: In financial mode, add stocks to your watchlist
@@ -135,7 +135,7 @@ TartanHacks-2026/
 
 ### Frontend
 - React
-- Google Maps API
+- Mapbox GL JS
 - Axios (HTTP client)
 
 ## Notes
@@ -143,9 +143,9 @@ TartanHacks-2026/
 - The news scraper respects rate limits and includes delays between requests
 - Location detection works best with OpenAI API key, but has fallback methods
 - Stock prices in portfolio are currently mocked (replace with real API in production)
-- **API Keys**: Both Google Maps and OpenAI API keys should be stored in `.env` files (never commit these to git)
+- **API Keys**: Both Mapbox and OpenAI API keys should be stored in `.env` files (never commit these to git)
   - Backend: `backend/.env` with `OPENAI_API_KEY`
-  - Frontend: `frontend/.env` with `REACT_APP_GOOGLE_MAPS_API_KEY` and `REACT_APP_API_URL`
+  - Frontend: `frontend/.env` with `REACT_APP_MAPBOX_ACCESS_TOKEN` and `REACT_APP_API_URL`
 
 ## License
 

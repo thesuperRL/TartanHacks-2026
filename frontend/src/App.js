@@ -13,7 +13,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api
 
 // Debug: Log the API URL being used
 console.log('API Base URL:', API_BASE_URL);
-console.log('Google Maps API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Set' : 'Not set');
+console.log('Mapbox Access Token:', process.env.REACT_APP_MAPBOX_ACCESS_TOKEN ? 'Set' : 'Not set');
 
 function App() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();

@@ -480,7 +480,7 @@ def predict_article_impact():
 
 if __name__ == '__main__':
     # Use port 5001 to avoid conflict with macOS AirPlay Receiver on port 5000
-    port = int(os.getenv('PORT', 5001))
+    port = int(os.getenv('PORT', 5003))
     print(f"Starting backend server on http://localhost:{port}")
     print("CORS enabled for all origins")
     app.run(debug=True, port=port, host='0.0.0.0')

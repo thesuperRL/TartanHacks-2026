@@ -6,7 +6,7 @@
   display: block;
 }
 
-.google-map-container {
+.mapbox-map-container {
   width: 100% !important;
   height: 100% !important;
   position: absolute !important;
@@ -15,6 +15,19 @@
   min-height: 400px;
   z-index: 1;
   border-radius: 0;
+}
+
+.mapbox-marker {
+  transition: all 0.3s ease;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .street-view-container {
