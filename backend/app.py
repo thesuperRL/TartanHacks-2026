@@ -2,7 +2,9 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
 from news_scraper import NewsScraper
 from news_processor import NewsProcessor
+from stock_prediction2 import StockPredictor
 import os
+import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,6 +22,7 @@ CORS(app,
 # Initialize components
 scraper = NewsScraper()
 processor = NewsProcessor()
+stock_predictor = StockPredictor()
 
 @app.route('/api/news', methods=['GET', 'OPTIONS'])
 @cross_origin()
@@ -61,6 +64,117 @@ def health_check():
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
     return jsonify({'status': 'healthy', 'cors': 'enabled'})
+
+@app.route('/api/predict/article-impact', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def predict_article_impact():
+    """
+    Predict the impact of an article on multiple asset prices.
+    
+    Expected JSON input:
+    {
+        "assets": ["AAPL", "MSFT", "GOOGL"],
+        "article": {
+            "title": "...",
+            "content": "...",
+            "source": "..."
+        }
+    }
+    
+    Returns predicted price movements for each asset over the next few weeks.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        
+        # Validate input
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Request body must contain JSON data'
+            }), 400
+        
+        assets = data.get('assets')
+        article = data.get('article')
+        
+        # Validate assets
+        if not assets:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing required field: assets (must be a list of stock symbols)'
+            }), 400
+        
+        if not isinstance(assets, list):
+            return jsonify({
+                'status': 'error',
+                'message': 'assets must be a list of stock symbols'
+            }), 400
+        
+        if len(assets) == 0:
+            return jsonify({
+                'status': 'error',
+                'message': 'assets list cannot be empty'
+            }), 400
+        
+        # Validate article
+        if not article:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing required field: article'
+            }), 400
+        
+        if not isinstance(article, dict):
+            return jsonify({
+                'status': 'error',
+                'message': 'article must be an object with content'
+            }), 400
+        
+        article_content = article.get('content') or article.get('title', '')
+        if not article_content:
+            return jsonify({
+                'status': 'error',
+                'message': 'article must contain either "content" or "title" field'
+            }), 400
+        
+        # Generate predictions (call async function using asyncio)
+        try:
+            predictions = asyncio.run(stock_predictor.predict_article_impact(assets, article))
+        except RuntimeError:
+            # If event loop is already running, use a different approach
+            loop = asyncio.get_event_loop()
+            predictions = loop.run_until_complete(stock_predictor.predict_article_impact(assets, article))
+        
+        # If AI returned an error object, propagate it
+        if isinstance(predictions, dict) and predictions.get('status') == 'error':
+            return jsonify({
+                'status': 'error',
+                'message': predictions.get('message', 'AI error')
+            }), 500
+
+        if not isinstance(predictions, dict):
+            return jsonify({
+                'status': 'error',
+                'message': 'Unexpected prediction response format from AI'
+            }), 500
+
+        return jsonify({
+            'status': 'success',
+            'data': predictions
+        }), 200
+    
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Invalid input: {str(e)}'
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error processing prediction: {str(e)}'
+        }), 500
+
 
 if __name__ == '__main__':
     # Use port 5001 to avoid conflict with macOS AirPlay Receiver on port 5000
