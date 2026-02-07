@@ -160,11 +160,43 @@
   vertical-align: middle;
 }
 
-.user-info {
+.nav-buttons {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  margin-right: 20px;
+}
+
+.nav-button {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.nav-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.nav-button.active {
+  background: linear-gradient(135deg, #00D4FF 0%, #0099FF 100%);
+  color: #fff;
+  border-color: #00D4FF;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   opacity: 0;
   transform: translateY(-10px);
   transition: opacity 0.25s ease-out, transform 0.25s ease-out;

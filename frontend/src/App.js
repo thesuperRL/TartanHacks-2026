@@ -9,6 +9,7 @@ import AuthModal from './components/AuthModal';
 import SettingsModal from './components/SettingsModal';
 import LogoAnimation from './components/LogoAnimation';
 import PredictionResults from './components/PredictionResults';
+import KnowledgeGraph from './components/KnowledgeGraph';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
@@ -19,6 +20,7 @@ console.log('Mapbox Access Token:', process.env.REACT_APP_MAPBOX_ACCESS_TOKEN ? 
 
 function App() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+  const [currentPage, setCurrentPage] = useState('map'); // 'map' or 'knowledge-graph'
   const [articles, setArticles] = useState([]);
   const [demoArticles] = useState(() => generateDemoArticles());
   const [popularArticles, setPopularArticles] = useState([
@@ -475,6 +477,22 @@ function App() {
           <h1>🌍 Global News Explorer</h1>
           {isAuthenticated && (
             <>
+              <div className="nav-buttons">
+                <button
+                  className={`nav-button ${currentPage === 'map' ? 'active' : ''}`}
+                  onClick={() => setCurrentPage('map')}
+                  title="Map View"
+                >
+                  🗺️ Map
+                </button>
+                <button
+                  className={`nav-button ${currentPage === 'knowledge-graph' ? 'active' : ''}`}
+                  onClick={() => setCurrentPage('knowledge-graph')}
+                  title="Knowledge Graph"
+                >
+                  🧠 Knowledge Graph
+                </button>
+              </div>
               <div className="user-info">
                 <button 
                   className="user-name-button" 
@@ -494,30 +512,36 @@ function App() {
         <div className="app-content-inner">
           {isAuthenticated && (
             <>
-              <Sidebar
-                popularArticles={[...popularArticles, ...demoArticles]}
-                onArticleClick={handleArticleClick}
-                selectedArticle={selectedArticle}
-                portfolioMinimized={portfolioMinimized}
-                onPortfolioMinimize={setPortfolioMinimized}
-                articlesMinimized={sidebarMinimized}
-                onArticlesMinimize={setSidebarMinimized}
-                predictions={predictions}
-                predictionsLoading={predictionsLoading}
-                predictionMinimized={predictionMinimized}
-                onPredictionMinimize={setPredictionMinimized}
-                portfolio={portfolio}
-                stocks={stocks}
-              />
-              <div className="map-container">
-                <MapViewer 
-                  articles={articles}
-                  selectedArticle={selectedArticle}
-                  onArticleSelect={setSelectedArticle}
-                  portfolio={portfolio}
-                  stocks={stocks}
-                />
-              </div>
+              {currentPage === 'map' ? (
+                <>
+                  <Sidebar
+                    popularArticles={[...popularArticles, ...demoArticles]}
+                    onArticleClick={handleArticleClick}
+                    selectedArticle={selectedArticle}
+                    portfolioMinimized={portfolioMinimized}
+                    onPortfolioMinimize={setPortfolioMinimized}
+                    articlesMinimized={sidebarMinimized}
+                    onArticlesMinimize={setSidebarMinimized}
+                    predictions={predictions}
+                    predictionsLoading={predictionsLoading}
+                    predictionMinimized={predictionMinimized}
+                    onPredictionMinimize={setPredictionMinimized}
+                    portfolio={portfolio}
+                    stocks={stocks}
+                  />
+                  <div className="map-container">
+                    <MapViewer 
+                      articles={articles}
+                      selectedArticle={selectedArticle}
+                      onArticleSelect={setSelectedArticle}
+                      portfolio={portfolio}
+                      stocks={stocks}
+                    />
+                  </div>
+                </>
+              ) : (
+                <KnowledgeGraph portfolio={portfolio} stocks={stocks} />
+              )}
             </>
           )}
         </div>
