@@ -54,10 +54,17 @@ const DailyDigestVideo = ({ portfolio, stocks, predictions }) => {
       }
       
       // Set audio URL if available (prefer video if both exist)
+      // Prepend API base URL if the URL is relative
       if (data.video_url) {
-        setVideoUrl(data.video_url);
+        const url = data.video_url.startsWith('http') 
+          ? data.video_url 
+          : `${API_BASE_URL}${data.video_url}`;
+        setVideoUrl(url);
       } else if (data.audio_url) {
-        setVideoUrl(data.audio_url);
+        const url = data.audio_url.startsWith('http') 
+          ? data.audio_url 
+          : `${API_BASE_URL}${data.audio_url}`;
+        setVideoUrl(url);
       }
     } catch (err) {
       console.error('Video generation error:', err);

@@ -885,6 +885,9 @@ Format as a clear script with natural speech patterns."""
         
         # Generate audio using OpenAI TTS
         try:
+            print("Generating audio with OpenAI TTS...")
+            print(f"Script length: {len(script)} characters")
+            
             audio_response = client.audio.speech.create(
                 model="tts-1",
                 voice="alloy",  # Options: alloy, echo, fable, onyx, nova, shimmer
@@ -892,9 +895,38 @@ Format as a clear script with natural speech patterns."""
             )
             
             # Save audio to temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as audio_file:
-                audio_file.write(audio_response.content)
-                audio_path = audio_file.name
+            # OpenAI TTS returns binary content directly
+            audio_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3').name
+            print(f"Saving audio to: {audio_path}")
+            
+            # The response content is bytes that can be written directly
+            # Try different ways to access the content
+            audio_bytes = None
+            if hasattr(audio_response, 'content'):
+                audio_bytes = audio_response.content
+            elif hasattr(audio_response, 'read'):
+                audio_bytes = audio_response.read()
+            else:
+                # Try to get bytes directly
+                audio_bytes = bytes(audio_response)
+            
+            if not audio_bytes:
+                raise Exception("OpenAI TTS returned empty audio content")
+            
+            print(f"Received {len(audio_bytes)} bytes of audio data")
+            
+            with open(audio_path, 'wb') as audio_file:
+                audio_file.write(audio_bytes)
+            
+            # Verify the file was created and has content
+            if not os.path.exists(audio_path):
+                raise Exception("Audio file was not created")
+            
+            file_size = os.path.getsize(audio_path)
+            if file_size == 0:
+                raise Exception("Audio file is empty")
+            
+            print(f"Audio file created successfully: {audio_path} ({file_size} bytes)")
             
             # Create a simple video with the audio
             # We'll use a static image or gradient background
@@ -934,9 +966,14 @@ Format as a clear script with natural speech patterns."""
                 video_path = None
             
             # Store file paths temporarily (in production, upload to S3 or similar)
-            temp_files[os.path.basename(audio_path)] = audio_path
+            audio_filename = os.path.basename(audio_path)
+            temp_files[audio_filename] = audio_path
+            print(f"Stored audio file in temp_files: {audio_filename} -> {audio_path}")
+            
             if video_path and os.path.exists(video_path):
-                temp_files[os.path.basename(video_path)] = video_path
+                video_filename = os.path.basename(video_path)
+                temp_files[video_filename] = video_path
+                print(f"Stored video file in temp_files: {video_filename} -> {video_path}")
             
             # Return audio file path or video if created
             if video_path and os.path.exists(video_path):
@@ -962,14 +999,17 @@ Format as a clear script with natural speech patterns."""
                 }), 200
                 
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             print(f"Error generating audio: {e}")
+            print(f"Traceback: {error_details}")
             # Fallback: return script only
             return jsonify({
-                'status': 'success',
+                'status': 'error',
                 'script': script,
                 'audio_url': None,
                 'video_url': None,
-                'message': 'Script generated. Audio generation failed.',
+                'message': f'Script generated. Audio generation failed: {str(e)}',
                 'portfolio_summary': portfolio_summary,
                 'predictions_summary': predictions_summary
             }), 200
@@ -989,18 +1029,38 @@ temp_files = {}
 def get_audio_file(filename):
     """Serve generated audio file"""
     try:
-        if filename in temp_files and os.path.exists(temp_files[filename]):
-            return send_file(
-                temp_files[filename],
-                mimetype='audio/mpeg',
-                as_attachment=False,
-                download_name='daily-digest-podcast.mp3'
-            )
-        return jsonify({
-            'status': 'error',
-            'message': 'Audio file not found'
-        }), 404
+        print(f"Request for audio file: {filename}")
+        print(f"Available files in temp_files: {list(temp_files.keys())}")
+        
+        if filename in temp_files:
+            file_path = temp_files[filename]
+            print(f"Found file path: {file_path}")
+            
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                print(f"Serving audio file: {file_path} ({file_size} bytes)")
+                return send_file(
+                    file_path,
+                    mimetype='audio/mpeg',
+                    as_attachment=False,
+                    download_name='daily-digest-podcast.mp3'
+                )
+            else:
+                print(f"File path does not exist: {file_path}")
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Audio file not found at path: {file_path}'
+                }), 404
+        else:
+            print(f"Filename not in temp_files: {filename}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Audio file not found: {filename}'
+            }), 404
     except Exception as e:
+        import traceback
+        print(f"Error serving audio file: {e}")
+        print(traceback.format_exc())
         return jsonify({
             'status': 'error',
             'message': str(e)

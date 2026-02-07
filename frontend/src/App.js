@@ -10,6 +10,7 @@ import SettingsModal from './components/SettingsModal';
 import LogoAnimation from './components/LogoAnimation';
 import PredictionResults from './components/PredictionResults';
 import ModeSelector from './components/ModeSelector';
+import KnowledgeGraph from './components/KnowledgeGraph';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
@@ -161,6 +162,7 @@ function App() {
   const [portfolioMinimized, setPortfolioMinimized] = useState(false);
   const [predictionMinimized, setPredictionMinimized] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
   const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
   const [predictions, setPredictions] = useState(null);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
@@ -240,7 +242,7 @@ function App() {
       if (isAuthenticated) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            const buttons = document.querySelectorAll('.refresh-button, .user-info');
+            const buttons = document.querySelectorAll('.refresh-button, .user-info, .nav-button');
             buttons.forEach((btn, i) => {
               requestAnimationFrame(() => {
                 setTimeout(() => {
@@ -292,7 +294,7 @@ function App() {
           // Animate buttons with slight delay
           requestAnimationFrame(() => {
             setTimeout(() => {
-              const buttons = document.querySelectorAll('.refresh-button, .user-info');
+              const buttons = document.querySelectorAll('.refresh-button, .user-info, .nav-button');
               buttons.forEach((btn, i) => {
                 requestAnimationFrame(() => {
                   setTimeout(() => {
@@ -333,7 +335,7 @@ function App() {
     if (prevAuthenticatedRef.current === true && isAuthenticated === false) {
       // User just logged out - use CSS classes
       const header = document.querySelector('.app-header h1');
-      const buttons = document.querySelectorAll('.refresh-button, .user-info, .sidebar, .map-container');
+      const buttons = document.querySelectorAll('.refresh-button, .user-info, .nav-button, .sidebar, .map-container');
       const content = document.querySelector('.app-content');
       
       if (header) header.classList.add('animate-out');
@@ -552,6 +554,15 @@ function App() {
           {isAuthenticated && (
             <>
               <ModeSelector selectedMode={mode} onModeChange={setMode} />
+              <div className="nav-buttons">
+                <button 
+                  className="nav-button"
+                  onClick={() => setShowKnowledgeGraph(true)}
+                  title="Open Knowledge Graph"
+                >
+                  🧠 Knowledge Graph
+                </button>
+              </div>
               <div className="user-info">
                 <button 
                   className="user-name-button" 
@@ -570,33 +581,53 @@ function App() {
 
         <div className="app-content-inner">
           {isAuthenticated && (
-            <>
-              <Sidebar
-                popularArticles={[...popularArticles, ...demoArticles]}
-                onArticleClick={handleArticleClick}
-                selectedArticle={selectedArticle}
-                portfolioMinimized={portfolioMinimized}
-                onPortfolioMinimize={setPortfolioMinimized}
-                articlesMinimized={sidebarMinimized}
-                onArticlesMinimize={setSidebarMinimized}
-                predictions={predictions}
-                predictionsLoading={predictionsLoading}
-                predictionMinimized={predictionMinimized}
-                onPredictionMinimize={setPredictionMinimized}
-                portfolio={portfolio}
-                stocks={stocks}
-              />
-              <div className="map-container">
-                <MapViewer 
-                  articles={articles}
+            showKnowledgeGraph ? (
+              <div style={{ 
+                width: '100%', 
+                height: '100%', 
+                position: 'relative',
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <button
+                  className="nav-button"
+                  onClick={() => setShowKnowledgeGraph(false)}
+                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
+                >
+                  ← Back to Map
+                </button>
+                <KnowledgeGraph portfolio={portfolio} stocks={stocks} />
+              </div>
+            ) : (
+              <>
+                <Sidebar
+                  popularArticles={[...popularArticles, ...demoArticles]}
+                  onArticleClick={handleArticleClick}
                   selectedArticle={selectedArticle}
-                  onArticleSelect={setSelectedArticle}
+                  portfolioMinimized={portfolioMinimized}
+                  onPortfolioMinimize={setPortfolioMinimized}
+                  articlesMinimized={sidebarMinimized}
+                  onArticlesMinimize={setSidebarMinimized}
+                  predictions={predictions}
+                  predictionsLoading={predictionsLoading}
+                  predictionMinimized={predictionMinimized}
+                  onPredictionMinimize={setPredictionMinimized}
                   portfolio={portfolio}
                   stocks={stocks}
-                  mode={mode}
                 />
-              </div>
-            </>
+                <div className="map-container">
+                  <MapViewer 
+                    articles={articles}
+                    selectedArticle={selectedArticle}
+                    onArticleSelect={setSelectedArticle}
+                    portfolio={portfolio}
+                    stocks={stocks}
+                    mode={mode}
+                  />
+                </div>
+              </>
+            )
           )}
         </div>
       </div>
