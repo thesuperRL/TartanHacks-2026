@@ -1,105 +1,136 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { loadGoogleStreetView } from '../utils/loadGoogleStreetView';
 import './PhotosphereViewer.css';
 
-const PhotosphereViewer = ({ isOpen, onClose, articleTitle, location }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+const PhotosphereViewer = ({ isOpen, onClose, articleTitle, location, lat, lng, storyContext }) => {
+    const panoramaRef = useRef(null);
+    const [streetViewLoaded, setStreetViewLoaded] = useState(false);
+    const [loadingError, setLoadingError] = useState(null);
+    const [googleMaps, setGoogleMaps] = useState(null);
 
-    const getImages = () => {
-        const titleLower = (articleTitle || '').toLowerCase();
-        const locationLower = (location || '').toLowerCase();
-
-        if (titleLower.includes('trump') || titleLower.includes('ice') ||
-            titleLower.includes('immigration') || locationLower.includes('washington') ||
-            locationLower.includes('dc')) {
-            return [
-                { src: '/images/trump/Gemini_Generated_Image_ohcjcqohcjcqohcj.png', caption: 'Protests outside the Capitol building' },
-                { src: '/images/trump/Gemini_Generated_Image_4mr4hf4mr4hf4mr4.png', caption: 'Immigration policy demonstration' }
-            ];
-        }
-
-        if (titleLower.includes('london') || titleLower.includes('wales') ||
-            titleLower.includes('brexit') || titleLower.includes('reform') ||
-            locationLower.includes('london') || locationLower.includes('uk') ||
-            locationLower.includes('wales')) {
-            return [
-                { src: '/images/london/susan.png', caption: 'Street scene in London' }
-            ];
-        }
-
-        if (titleLower.includes('new york') || titleLower.includes('nycha') ||
-            titleLower.includes('mayor') || locationLower.includes('new york') ||
-            locationLower.includes('nyc') || locationLower.includes('wall street')) {
-            return [
-                { src: '/images/new york/mamdani.png', caption: 'New York City view' }
-            ];
-        }
-
-        return [];
-    };
-
-    const images = getImages();
-
+    // Load Google Street View API
     useEffect(() => {
-        if (!isOpen) {
-            setCurrentIndex(0);
+        if (!isOpen) return;
+
+        console.log('Loading Google Street View API...');
+        loadGoogleStreetView()
+            .then((maps) => {
+                console.log('Google Street View API loaded successfully');
+                setGoogleMaps(maps);
+                setLoadingError(null);
+            })
+            .catch((error) => {
+                console.error('Error loading Google Street View:', error);
+                setLoadingError(error.message);
+            });
+    }, [isOpen]);
+
+    // Initialize Street View panorama
+    useEffect(() => {
+        if (!isOpen || !googleMaps || !panoramaRef.current || !lat || !lng) return;
+
+        console.log('Initializing Street View panorama at:', lat, lng);
+
+        try {
+            // Check if Street View is available at this location
+            const streetViewService = new googleMaps.StreetViewService();
+            streetViewService.getPanorama(
+                { location: { lat, lng }, radius: 50 },
+                (data, status) => {
+                    if (status === 'OK' && data && data.location) {
+                        // Use the actual panorama location from the service
+                        const panoramaLocation = data.location.latLng;
+
+                        // Initialize Street View panorama
+                        const panorama = new googleMaps.StreetViewPanorama(panoramaRef.current, {
+                            position: panoramaLocation,
+                            pov: { heading: 270, pitch: 0 },
+                            zoom: 1,
+                            visible: true,
+                            addressControl: false,
+                            linksControl: true,
+                            panControl: true,
+                            enableCloseButton: false,
+                            fullscreenControl: true,
+                            zoomControl: true
+                        });
+
+                        panorama.addListener('status_changed', () => {
+                            const panoStatus = panorama.getStatus();
+                            if (panoStatus === 'OK') {
+                                setStreetViewLoaded(true);
+                                console.log('Street View loaded successfully');
+                            } else {
+                                setLoadingError('Street View imagery is not available at this location');
+                                console.log('Street View status:', panoStatus);
+                            }
+                        });
+
+                        setStreetViewLoaded(true);
+                    } else {
+                        setLoadingError('Street View imagery is not available at this location. Try a different location.');
+                        console.log('Street View not available:', status);
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('Error initializing Street View:', error);
+            setLoadingError(error.message || 'Failed to initialize Street View');
+        }
+    }, [isOpen, googleMaps, lat, lng]);
+
+    // Cleanup when modal closes
+    useEffect(() => {
+        if (!isOpen && panoramaRef.current) {
+            // Clear the panorama container
+            panoramaRef.current.innerHTML = '';
+            setStreetViewLoaded(false);
+            setLoadingError(null);
         }
     }, [isOpen]);
 
+    // Handle escape key
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyPress = (e) => {
-            if (e.key === 'ArrowLeft') setCurrentIndex(prev => Math.max(0, prev - 1));
-            else if (e.key === 'ArrowRight') setCurrentIndex(prev => Math.min(images.length - 1, prev + 1));
-            else if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') onClose();
         };
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isOpen, onClose, images.length]);
+    }, [isOpen, onClose]);
 
     if (!isOpen) return null;
-
-    if (images.length === 0) {
-        return (
-            <div className="gallery-overlay" onClick={onClose}>
-                <div className="gallery-content" onClick={(e) => e.stopPropagation()}>
-                    <button className="gallery-close" onClick={onClose}>×</button>
-                    <div className="gallery-error">No images available for this location</div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="gallery-overlay" onClick={onClose}>
             <div className="gallery-content" onClick={(e) => e.stopPropagation()}>
                 <button className="gallery-close" onClick={onClose}>×</button>
-
-                <div className="gallery-main">
-                    {images.length > 1 && currentIndex > 0 && (
-                        <button className="gallery-nav gallery-prev" onClick={() => setCurrentIndex(prev => prev - 1)}>‹</button>
-                    )}
-
-                    <div className="gallery-image-container">
-                        <img src={images[currentIndex].src} alt={images[currentIndex].caption} className="gallery-image" />
-                        <div className="gallery-caption">{images[currentIndex].caption}</div>
-                    </div>
-
-                    {images.length > 1 && currentIndex < images.length - 1 && (
-                        <button className="gallery-nav gallery-next" onClick={() => setCurrentIndex(prev => prev + 1)}>›</button>
-                    )}
-                </div>
-
-                {images.length > 1 && (
-                    <div className="gallery-dots">
-                        {images.map((_, idx) => (
-                            <button
-                                key={idx}
-                                className={`gallery-dot ${idx === currentIndex ? 'active' : ''}`}
-                                onClick={() => setCurrentIndex(idx)}
-                            />
-                        ))}
+                
+                {(articleTitle || location || storyContext) && (
+                    <div className="gallery-header">
+                        {articleTitle && <h3>{articleTitle}</h3>}
+                        {location && <p className="gallery-location">{location}</p>}
+                        {storyContext && <p className="gallery-context">{storyContext}</p>}
                     </div>
                 )}
+
+                <div className="gallery-main street-view-container">
+                    {loadingError ? (
+                        <div className="gallery-error">
+                            <p>{loadingError}</p>
+                            <button onClick={onClose} className="error-close-button">Close</button>
+                        </div>
+                    ) : !streetViewLoaded ? (
+                        <div className="gallery-loading">
+                            <p>Loading Street View...</p>
+                        </div>
+                    ) : null}
+                    <div
+                        ref={panoramaRef}
+                        className="street-view-panorama"
+                        style={{ width: '100vw', height: '100vh' }}
+                    />
+                </div>
             </div>
         </div>
     );
