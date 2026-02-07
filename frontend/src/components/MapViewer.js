@@ -7,7 +7,7 @@ import { generateDemoArticles } from '../utils/generateDemoArticles';
 import { checkArticleImpact } from '../utils/checkArticleImpact';
 import './MapViewer.css';
 
-const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [] }) => {
+const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [], mode = 'economic' }) => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [mapbox, setMapbox] = useState(null);
@@ -15,9 +15,16 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   const [mapLoaded, setMapLoaded] = useState(false);
   const markersRef = useRef([]);
   const popupsRef = useRef([]);
+  const currentOpenPopupRef = useRef(null);
+  const currentOpenMarkerRef = useRef(null);
   const [currentZoom, setCurrentZoom] = useState(2);
   const [mapBounds, setMapBounds] = useState(null);
-  const [demoArticles] = useState(() => generateDemoArticles());
+  const [demoArticles, setDemoArticles] = useState(() => generateDemoArticles(mode));
+  
+  // Update demo articles when mode changes
+  useEffect(() => {
+    setDemoArticles(generateDemoArticles(mode));
+  }, [mode]);
 
   // Modal states
   const [photosphereOpen, setPhotosphereOpen] = useState(false);
@@ -25,6 +32,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   const [photosphereTitle, setPhotosphereTitle] = useState('');
   const [photosphereLocation, setPhotosphereLocation] = useState('');
   const [photosphereStoryContext, setPhotosphereStoryContext] = useState('');
+  const [photosphereSummary, setPhotosphereSummary] = useState('');
+  const [photosphereReasoning, setPhotosphereReasoning] = useState('');
   const [mindMapOpen, setMindMapOpen] = useState(false);
   const [mindMapTitle, setMindMapTitle] = useState('');
   const [mindMapLocation, setMindMapLocation] = useState('');
@@ -291,18 +300,28 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
     }
   }, [mapbox]);
 
-  // Update markers when articles change or zoom changes
+  // Update markers when articles change, zoom changes, or mode changes
   useEffect(() => {
     if (!mapRef.current || !mapbox || !mapLoaded) return;
 
     const map = mapRef.current;
     const mapboxgl = window.mapboxgl || mapbox;
 
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.remove());
+    // Clear existing markers and popups
+    markersRef.current.forEach(marker => {
+      // Remove any popup attached to the marker
+      if (marker.getPopup()) {
+        marker.getPopup().remove();
+      }
+      marker.remove();
+    });
     markersRef.current = [];
-    popupsRef.current.forEach(popup => popup.remove());
+    popupsRef.current.forEach(popup => {
+      if (popup) popup.remove();
+    });
     popupsRef.current = [];
+    currentOpenPopupRef.current = null;
+    currentOpenMarkerRef.current = null;
 
     // Get current map bounds to filter markers on opposite side of globe
     const bounds = mapBounds || map.getBounds();
@@ -373,6 +392,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
 
     // Filter articles with gradual zoom-based visibility
     // Use demo articles if no articles provided, otherwise use provided articles
+    // Always use demoArticles as fallback to ensure markers are shown
     const allArticles = articles.length > 0 ? articles : demoArticles;
     
     // Filter articles with gradual appearance based on zoom level
@@ -436,13 +456,16 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       const impactReason = impactResult.reason;
       
       // Determine marker color: pink/red if impacts holdings, otherwise category-based
+      // Use mode to determine color if category is not clear
       let markerGradient;
       if (impactsHoldings) {
         markerGradient = 'linear-gradient(135deg,#ff6b6b,#ec4899)'; // Pink/red for impactful
       } else {
-        markerGradient = article.category === 'financial' 
-          ? 'linear-gradient(135deg,#4a9eff,#3a8eef)' 
-          : 'linear-gradient(135deg,#ff6b6b,#ec4899)';
+        // Check category first, then fall back to mode
+        const articleCategory = article.category || (mode === 'political' ? 'political' : 'financial');
+        markerGradient = articleCategory === 'financial' 
+          ? 'linear-gradient(135deg,#4a9eff,#3a8eef)' // Blue for financial
+          : 'linear-gradient(135deg,#8b5cf6,#7c3aed)'; // Purple for political
       }
       
       // Store impact reason in article for popup display
@@ -490,7 +513,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
           <div class="marker-info">
             <h3>${article.title}</h3>
           <p style="margin: 4px 0; color: rgba(255,255,255,0.7);">${article.location}</p>
-          <span class="category-badge ${article.category}">${article.category === 'financial' ? '💰 Financial' : '🏛️ Political'}</span>
+          <span class="category-badge ${article.category || (mode === 'political' ? 'political' : 'financial')}">${(article.category || (mode === 'political' ? 'political' : 'financial')) === 'financial' ? '💰 Financial' : '🏛️ Political'}</span>
           ${impactReasonHTML}
           <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; width: 100%;">
             <button id="images-btn-${article.id}" style="
@@ -552,10 +575,12 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       });
 
       // Capture article data for button handlers
-      const articleLat = lat;
-      const articleLng = lng;
+      // Ensure coordinates are numbers
+      const articleLat = typeof lat === 'number' ? lat : Number(lat);
+      const articleLng = typeof lng === 'number' ? lng : Number(lng);
       const articleTitle = article.title;
-      const articleLocation = article.location || '';
+      // Use location_name if available (from backend), otherwise use location
+      const articleLocation = article.location_name || article.location || '';
 
       // Function to attach button handlers
       const attachButtonHandlers = () => {
@@ -564,11 +589,26 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
           imagesBtn.dataset.handlersAttached = 'true';
           imagesBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            setPhotosphereCoords({ lat: articleLat, lng: articleLng });
-            setPhotosphereTitle(articleTitle);
-            setPhotosphereLocation(articleLocation);
-            setPhotosphereStoryContext(article.story_context || '');
-            setPhotosphereOpen(true);
+            // Ensure coordinates are valid numbers
+            const validLat = !isNaN(articleLat) && articleLat !== null && articleLat !== undefined;
+            const validLng = !isNaN(articleLng) && articleLng !== null && articleLng !== undefined;
+            
+            if (validLat && validLng) {
+              console.log('Setting Street View coordinates:', articleLat, articleLng);
+              setPhotosphereCoords({ lat: articleLat, lng: articleLng });
+              setPhotosphereTitle(articleTitle);
+              setPhotosphereLocation(articleLocation);
+              setPhotosphereStoryContext(article.story_context || '');
+              setPhotosphereSummary(article.summary || '');
+              // Use location_reasoning if available, otherwise generate a helpful fallback
+              const defaultReasoning = articleLocation 
+                ? `This location (${articleLocation}) is a significant landmark directly related to the article's ${article.category || 'topic'}.`
+                : 'This location is relevant to the article topic.';
+              setPhotosphereReasoning(article.location_reasoning || defaultReasoning);
+              setPhotosphereOpen(true);
+            } else {
+              console.error('Invalid coordinates for Street View:', { lat: articleLat, lng: articleLng });
+            }
           });
         }
 
@@ -600,14 +640,63 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
-        onArticleSelect(article);
-
-        // Close any existing popups first (except this one)
-        popupsRef.current.forEach(p => {
-          if (p && p !== popup) {
-            p.remove();
+        
+        // Aggressively close ALL popups - both from refs and from markers
+        // First, close the currently tracked popup
+        if (currentOpenPopupRef.current) {
+          try {
+            currentOpenPopupRef.current.remove();
+          } catch (err) {
+            console.warn('Error removing current popup:', err);
+          }
+          currentOpenPopupRef.current = null;
+        }
+        
+        // Close popup from the currently open marker
+        if (currentOpenMarkerRef.current) {
+          try {
+            const existingPopup = currentOpenMarkerRef.current.getPopup();
+            if (existingPopup) {
+              existingPopup.remove();
+            }
+            currentOpenMarkerRef.current.setPopup(null);
+          } catch (err) {
+            console.warn('Error removing marker popup:', err);
+          }
+          currentOpenMarkerRef.current = null;
+        }
+        
+        // Close ALL popups from ALL markers (comprehensive cleanup)
+        markersRef.current.forEach(m => {
+          try {
+            const mPopup = m.getPopup();
+            if (mPopup) {
+              mPopup.remove();
+            }
+            m.setPopup(null);
+          } catch (err) {
+            console.warn('Error removing marker popup:', err);
           }
         });
+        
+        // Also remove any popups that might be directly on the map
+        // Mapbox stores popups in the map's internal state, so we need to be thorough
+        try {
+          // Get all popup elements from the DOM and remove them
+          const popupElements = map.getContainer().querySelectorAll('.mapboxgl-popup');
+          popupElements.forEach(popupEl => {
+            try {
+              popupEl.remove();
+            } catch (err) {
+              console.warn('Error removing popup element:', err);
+            }
+          });
+        } catch (err) {
+          console.warn('Error querying popup elements:', err);
+        }
+        
+        // Update selected article
+        onArticleSelect(article);
 
         // Fly to the location
         map.flyTo({
@@ -619,12 +708,35 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
         // Show popup after a short delay to let flyTo start
         setTimeout(() => {
           console.log('Adding popup for:', article.title);
+          
+          // Double-check no other popups are open before adding this one
+          const existingPopups = map.getContainer().querySelectorAll('.mapboxgl-popup');
+          existingPopups.forEach(p => {
+            if (p && p.parentNode) {
+              p.remove();
+            }
+          });
+          
+          // Set this as the current open popup and marker
+          currentOpenPopupRef.current = popup;
+          currentOpenMarkerRef.current = marker;
+          
           marker.setPopup(popup);
           popup.addTo(map);
           console.log('Popup added, isOpen:', popup.isOpen());
 
           // Attach button handlers after popup is shown
           setTimeout(attachButtonHandlers, 200);
+          
+          // Listen for popup close event to clear refs
+          popup.on('close', () => {
+            if (currentOpenPopupRef.current === popup) {
+              currentOpenPopupRef.current = null;
+            }
+            if (currentOpenMarkerRef.current === marker) {
+              currentOpenMarkerRef.current = null;
+            }
+          });
         }, 300);
       });
 
@@ -632,7 +744,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       popupsRef.current.push(popup);
     });
 
-  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, mapBounds, demoArticles, stocks, portfolio]);
+  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, mapBounds, demoArticles, stocks, portfolio, mode]);
 
   return (
     <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>
@@ -657,6 +769,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
         articleTitle={photosphereTitle}
         location={photosphereLocation}
         storyContext={photosphereStoryContext}
+        articleSummary={photosphereSummary}
+        locationReasoning={photosphereReasoning}
       />
       <MindMapModal
         isOpen={mindMapOpen}

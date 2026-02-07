@@ -9,6 +9,7 @@ import AuthModal from './components/AuthModal';
 import SettingsModal from './components/SettingsModal';
 import LogoAnimation from './components/LogoAnimation';
 import PredictionResults from './components/PredictionResults';
+import ModeSelector from './components/ModeSelector';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
@@ -19,70 +20,141 @@ console.log('Mapbox Access Token:', process.env.REACT_APP_MAPBOX_ACCESS_TOKEN ? 
 
 function App() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
-  const [articles, setArticles] = useState([]);
-  const [demoArticles] = useState(() => generateDemoArticles());
-  const [popularArticles, setPopularArticles] = useState([
-    {
-      id: 'article-1',
-      title: 'Market Impact: Federal Reserve Signals Potential Rate Cuts in Q2',
-      summary: 'The Federal Reserve hints at monetary policy shifts that could impact bond yields and stock valuations across multiple sectors.',
-      category: 'financial',
-      location: 'Washington, DC',
-      source: 'Bloomberg',
-      url: 'https://www.bloomberg.com',
-      coordinates: { lat: 38.9072, lng: -77.0369 },
-      popularity_score: 0.9,
-      blurred: false
-    },
-    {
-      id: 'article-2',
-      title: 'Investment Outlook: Tech Stocks Rally on Strong Earnings Reports',
-      summary: 'Major technology companies exceed analyst expectations, driving significant gains in NASDAQ and attracting institutional investors.',
-      category: 'financial',
-      location: 'San Francisco',
-      source: 'Reuters',
-      url: 'https://www.reuters.com',
-      coordinates: { lat: 37.7749, lng: -122.4194 },
-      popularity_score: 0.85,
-      blurred: false
-    },
-    {
-      id: 'article-3',
-      title: 'Financial Analysis: Oil Prices Surge Amid Supply Chain Disruptions',
-      summary: 'Global energy markets experience volatility as geopolitical tensions affect crude oil supply chains and refinery operations.',
-      category: 'financial',
-      location: 'New York',
-      source: 'Financial Times',
-      url: 'https://www.ft.com',
-      coordinates: { lat: 40.7128, lng: -74.0060 },
-      popularity_score: 0.8,
-      blurred: false
-    },
-    {
-      id: 'article-4',
-      title: 'Trading Implications: Cryptocurrency Markets See Increased Institutional Adoption',
-      summary: 'Major banks and hedge funds announce cryptocurrency trading desks, signaling mainstream acceptance of digital assets.',
-      category: 'financial',
-      location: 'London',
-      source: 'CNBC',
-      url: 'https://www.cnbc.com',
-      coordinates: { lat: 51.5074, lng: -0.1278 },
-      popularity_score: 0.75,
-      blurred: false
-    },
-    {
-      id: 'article-5',
-      title: 'Economic Impact: Inflation Data Shows Cooling Trend in Consumer Prices',
-      summary: 'Latest CPI figures suggest the Federal Reserve\'s monetary policy is achieving its inflation targets, affecting bond markets.',
-      category: 'financial',
-      location: 'Washington, DC',
-      source: 'MarketWatch',
-      url: 'https://www.marketwatch.com',
-      coordinates: { lat: 38.9072, lng: -77.0369 },
-      popularity_score: 0.7,
-      blurred: false
+  // Generate default articles based on mode
+  const getDefaultArticles = (mode) => {
+    if (mode === 'political') {
+      return [
+        {
+          id: 'article-1',
+          title: 'Geopolitical Impact: International Summit Addresses Regional Tensions',
+          summary: 'World leaders convene to address escalating tensions and coordinate diplomatic responses to regional conflicts.',
+          category: 'political',
+          location: 'Washington, DC',
+          source: 'Reuters',
+          url: 'https://www.reuters.com',
+          coordinates: { lat: 38.9072, lng: -77.0369 },
+          popularity_score: 0.9,
+          blurred: false
+        },
+        {
+          id: 'article-2',
+          title: 'Political Analysis: Election Results Reshape Government Priorities',
+          summary: 'Recent election outcomes signal significant shifts in policy direction and international relations strategy.',
+          category: 'political',
+          location: 'London',
+          source: 'BBC',
+          url: 'https://www.bbc.com',
+          coordinates: { lat: 51.5074, lng: -0.1278 },
+          popularity_score: 0.85,
+          blurred: false
+        },
+        {
+          id: 'article-3',
+          title: 'Strategic Implications: Military Alliance Strengthens Defense Posture',
+          summary: 'Defense cooperation agreements are being strengthened as regional security concerns intensify.',
+          category: 'political',
+          location: 'Brussels',
+          source: 'CNN',
+          url: 'https://www.cnn.com',
+          coordinates: { lat: 50.8503, lng: 4.3517 },
+          popularity_score: 0.8,
+          blurred: false
+        },
+        {
+          id: 'article-4',
+          title: 'Diplomatic Developments: Trade Negotiations Reach Critical Phase',
+          summary: 'High-stakes negotiations between major powers enter a decisive phase with significant implications for global trade.',
+          category: 'political',
+          location: 'Geneva',
+          source: 'The Guardian',
+          url: 'https://www.theguardian.com',
+          coordinates: { lat: 46.2044, lng: 6.1432 },
+          popularity_score: 0.75,
+          blurred: false
+        },
+        {
+          id: 'article-5',
+          title: 'International Relations: Border Disputes Escalate in Conflict Zone',
+          summary: 'Territorial disputes intensify as diplomatic efforts to resolve tensions face mounting challenges.',
+          category: 'political',
+          location: 'Jerusalem',
+          source: 'Al Jazeera',
+          url: 'https://www.aljazeera.com',
+          coordinates: { lat: 31.7683, lng: 35.2137 },
+          popularity_score: 0.7,
+          blurred: false
+        }
+      ];
+    } else {
+      return [
+        {
+          id: 'article-1',
+          title: 'Market Impact: Federal Reserve Signals Potential Rate Cuts in Q2',
+          summary: 'The Federal Reserve hints at monetary policy shifts that could impact bond yields and stock valuations across multiple sectors.',
+          category: 'financial',
+          location: 'Washington, DC',
+          source: 'Bloomberg',
+          url: 'https://www.bloomberg.com',
+          coordinates: { lat: 38.9072, lng: -77.0369 },
+          popularity_score: 0.9,
+          blurred: false
+        },
+        {
+          id: 'article-2',
+          title: 'Investment Outlook: Tech Stocks Rally on Strong Earnings Reports',
+          summary: 'Major technology companies exceed analyst expectations, driving significant gains in NASDAQ and attracting institutional investors.',
+          category: 'financial',
+          location: 'San Francisco',
+          source: 'Reuters',
+          url: 'https://www.reuters.com',
+          coordinates: { lat: 37.7749, lng: -122.4194 },
+          popularity_score: 0.85,
+          blurred: false
+        },
+        {
+          id: 'article-3',
+          title: 'Financial Analysis: Oil Prices Surge Amid Supply Chain Disruptions',
+          summary: 'Global energy markets experience volatility as geopolitical tensions affect crude oil supply chains and refinery operations.',
+          category: 'financial',
+          location: 'New York',
+          source: 'Financial Times',
+          url: 'https://www.ft.com',
+          coordinates: { lat: 40.7128, lng: -74.0060 },
+          popularity_score: 0.8,
+          blurred: false
+        },
+        {
+          id: 'article-4',
+          title: 'Trading Implications: Cryptocurrency Markets See Increased Institutional Adoption',
+          summary: 'Major banks and hedge funds announce cryptocurrency trading desks, signaling mainstream acceptance of digital assets.',
+          category: 'financial',
+          location: 'London',
+          source: 'CNBC',
+          url: 'https://www.cnbc.com',
+          coordinates: { lat: 51.5074, lng: -0.1278 },
+          popularity_score: 0.75,
+          blurred: false
+        },
+        {
+          id: 'article-5',
+          title: 'Economic Impact: Inflation Data Shows Cooling Trend in Consumer Prices',
+          summary: 'Latest CPI figures suggest the Federal Reserve\'s monetary policy is achieving its inflation targets, affecting bond markets.',
+          category: 'financial',
+          location: 'Washington, DC',
+          source: 'MarketWatch',
+          url: 'https://www.marketwatch.com',
+          coordinates: { lat: 38.9072, lng: -77.0369 },
+          popularity_score: 0.7,
+          blurred: false
+        }
+      ];
     }
-  ]);
+  };
+
+  const [articles, setArticles] = useState([]);
+  const [mode, setMode] = useState('economic'); // 'economic' or 'political'
+  const [demoArticles, setDemoArticles] = useState(() => generateDemoArticles('economic'));
+  const [popularArticles, setPopularArticles] = useState(() => getDefaultArticles('economic'));
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
@@ -121,14 +193,23 @@ function App() {
     return () => unsubscribe();
   }, [isAuthenticated, user?.uid]);
 
+  // Update demo articles and default articles when mode changes
+  useEffect(() => {
+    setDemoArticles(generateDemoArticles(mode));
+    setPopularArticles(getDefaultArticles(mode));
+  }, [mode]);
+
   useEffect(() => {
     // Always initialize with demo articles for the map
     // The MapViewer will use demo articles if articles array is empty
     if (isAuthenticated) {
+      // Clear existing articles when mode changes
+      setArticles([]);
+      // Fetch new articles for the current mode
       fetchNews();
       fetchPopularNews();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, mode]);
 
   // Startup animations (only after logo animation completes) - using CSS classes for performance
   useEffect(() => {
@@ -274,7 +355,7 @@ function App() {
 
   const fetchNews = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/news?category=all`);
+      const response = await fetch(`${API_BASE_URL}/news?category=all&mode=${mode}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -291,25 +372,23 @@ function App() {
 
   const fetchPopularNews = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/news/popular?category=all`);
+      const response = await fetch(`${API_BASE_URL}/news/popular?category=all&mode=${mode}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      // Merge API articles with default articles, avoiding duplicates
+      // Replace articles instead of merging
       const apiArticles = Array.isArray(data) ? data : [];
-      setPopularArticles(prev => {
-        const existingIds = new Set(prev.map(a => a.id));
-        const newArticles = apiArticles.filter(a => !existingIds.has(a.id));
-        return [...prev, ...newArticles];
-      });
+      if (apiArticles.length > 0) {
+        setPopularArticles(apiArticles);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error fetching popular news:', error);
       if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
         console.error('Backend server may not be running. Please start it with: ./start-backend.sh');
       }
-      // Don't clear articles on error - keep the default ones
+      // On error, use demo articles as fallback
       setLoading(false);
     }
   };
@@ -397,36 +476,33 @@ function App() {
   const handleRefreshNews = async () => {
     setLoading(true);
     try {
-      // Add fake articles (mix of math and finance)
-      const newArticles = [
-        generateFakeArticle(),
-        generateFakeArticle()
-      ];
-      const fakeArticlesWithPrev = [...newArticles, ...popularArticles.slice(0, 3)];
-      setPopularArticles(fakeArticlesWithPrev);
+      // Clear existing articles first
+      setArticles([]);
+      setPopularArticles(getDefaultArticles(mode));
       
       // Also try to fetch real news if backend is available
       try {
-        await fetch(`${API_BASE_URL}/news/refresh`, { method: 'POST' });
+        await fetch(`${API_BASE_URL}/news/refresh`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: mode })
+        });
         await fetchNews();
         
-        // Fetch popular news but preserve fake articles if fetch fails
+        // Fetch popular news and replace existing articles
         try {
-          const response = await fetch(`${API_BASE_URL}/news/popular?category=all`);
+          const response = await fetch(`${API_BASE_URL}/news/popular?category=all&mode=${mode}`);
           if (response.ok) {
             const data = await response.json();
             if (Array.isArray(data) && data.length > 0) {
               setPopularArticles(data);
             }
-            // If backend returns empty, keep the fake articles
           }
         } catch (fetchErr) {
-          console.log('Backend news fetch failed, keeping generated articles');
-          // Keep the fake articles that were already set
+          console.log('Backend news fetch failed, using default articles');
         }
       } catch (err) {
-        console.log('Backend news unavailable, using generated articles');
-        // Keep the fake articles that were already set
+        console.log('Backend news unavailable, using default articles');
       }
     } catch (error) {
       console.error('Error refreshing news:', error);
@@ -475,6 +551,7 @@ function App() {
           <h1>🌍 Global News Explorer</h1>
           {isAuthenticated && (
             <>
+              <ModeSelector selectedMode={mode} onModeChange={setMode} />
               <div className="user-info">
                 <button 
                   className="user-name-button" 
@@ -516,6 +593,7 @@ function App() {
                   onArticleSelect={setSelectedArticle}
                   portfolio={portfolio}
                   stocks={stocks}
+                  mode={mode}
                 />
               </div>
             </>

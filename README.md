@@ -46,7 +46,9 @@ pip install -r requirements.txt
 4. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env and add your API keys:
+# - OPENAI_API_KEY (for AI-powered location detection)
+# - GOOGLE_MAPS_API_KEY (for Places API and Street View - get from https://console.cloud.google.com/google/maps-apis/credentials)
 ```
 
 5. Run the backend server:
