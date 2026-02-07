@@ -352,14 +352,14 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       const impactsHoldings = impactResult.impacts;
       const impactReason = impactResult.reason;
       
-      // Determine marker color: red if impacts holdings, otherwise category-based
+      // Determine marker color: pink/red if impacts holdings, otherwise category-based
       let markerGradient;
       if (impactsHoldings) {
-        markerGradient = 'linear-gradient(135deg,#FF3366,#FF0000)'; // Red for impactful
+        markerGradient = 'linear-gradient(135deg,#ff6b6b,#ec4899)'; // Pink/red for impactful
       } else {
         markerGradient = article.category === 'financial' 
-          ? 'linear-gradient(135deg,#00D4FF,#0099FF)' 
-          : 'linear-gradient(135deg,#FF6B9D,#FF3366)';
+          ? 'linear-gradient(135deg,#4a9eff,#3a8eef)' 
+          : 'linear-gradient(135deg,#ff6b6b,#ec4899)';
       }
       
       // Store impact reason in article for popup display
@@ -391,16 +391,13 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
         .setLngLat(coordinates)
         .addTo(map);
 
-      // Create popup content with bright colors and buttons
+      // Create popup content with theme colors
       const popupContent = document.createElement('div');
       popupContent.className = 'marker-popup';
-      const buttonGradient = article.category === 'financial'
-        ? 'linear-gradient(135deg, #00D4FF 0%, #0099FF 100%)'
-        : 'linear-gradient(135deg, #FF6B9D 0%, #FF3366 100%)';
 
       // Add impact reason if article impacts holdings
       const impactReasonHTML = impactReason 
-        ? `<div style="margin-top: 10px; padding: 10px; background: rgba(255, 51, 102, 0.15); border-left: 3px solid rgba(255, 51, 102, 0.6); border-radius: 6px;">
+        ? `<div style="margin-top: 10px; padding: 10px; background: rgba(236, 72, 153, 0.15); border-left: 3px solid rgba(236, 72, 153, 0.6); border-radius: 6px;">
              <strong style="color: rgba(255, 255, 255, 0.95); display: block; margin-bottom: 4px;">⚠️ Why this matters:</strong>
              <p style="margin: 0; color: rgba(255, 255, 255, 0.85); font-size: 12px; line-height: 1.5;">${impactReason}</p>
            </div>`
@@ -416,39 +413,39 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
             <button id="images-btn-${article.id}" style="
               display: inline-block;
               padding: 8px 16px;
-              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
               color: white;
               border: none;
               border-radius: 8px;
               font-size: 13px;
               font-weight: 600;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
               transition: all 0.2s;
               cursor: pointer;
             ">👁️ First-Person Perspective</button>
             <button id="mindmap-btn-${article.id}" style="
               display: inline-block;
               padding: 8px 16px;
-              background: linear-gradient(135deg, #9B59B6 0%, #8E44AD 100%);
+              background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
               color: white;
               border: none;
               border-radius: 8px;
               font-size: 13px;
               font-weight: 600;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
               transition: all 0.2s;
               cursor: pointer;
             ">🧠 View Mind Map</button>
             <button id="podcast-btn-${article.id}" style="
               display: inline-block;
               padding: 8px 16px;
-              background: linear-gradient(135deg, #52C41A 0%, #389E0D 100%);
+              background: linear-gradient(135deg, #4a9eff 0%, #3a8eef 100%);
               color: white;
               border: none;
               border-radius: 8px;
               font-size: 13px;
               font-weight: 600;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
               transition: all 0.2s;
               cursor: pointer;
             ">🎧 Listen to Podcast</button>

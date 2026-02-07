@@ -66,7 +66,7 @@
   font-weight: 700;
   color: #fff;
   line-height: 1.4;
-  background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 50%, #ec4899 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -94,11 +94,11 @@
 }
 
 .marker-info .category-badge.financial {
-  background: linear-gradient(135deg, #00D4FF 0%, #0099FF 100%);
+  background: linear-gradient(135deg, #4a9eff 0%, #3a8eef 100%);
 }
 
 .marker-info .category-badge.political {
-  background: linear-gradient(135deg, #FF6B9D 0%, #FF3366 100%);
+  background: linear-gradient(135deg, #ff6b6b 0%, #ec4899 100%);
 }
 
 .marker-info .category-badge:hover {
@@ -153,8 +153,8 @@
 }
 
 .mapboxgl-popup-close-button:hover {
-  color: #FF3366 !important;
-  background: rgba(255, 51, 102, 0.2) !important;
+  color: #ff6b6b !important;
+  background: rgba(236, 72, 153, 0.2) !important;
   transform: scale(1.1);
 }
 
