@@ -14,13 +14,28 @@ if [ ! -f ".env" ]; then
     echo "Warning: .env file not found. Creating from template..."
     echo "REACT_APP_API_URL=http://localhost:5001/api" > .env
     echo "REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here" >> .env
-    echo "Please edit frontend/.env and add your Google Maps API key"
+    echo "" >> .env
+    echo "# Firebase Configuration (required for authentication)" >> .env
+    echo "REACT_APP_FIREBASE_API_KEY=your_firebase_api_key" >> .env
+    echo "REACT_APP_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com" >> .env
+    echo "REACT_APP_FIREBASE_PROJECT_ID=your-project-id" >> .env
+    echo "REACT_APP_FIREBASE_STORAGE_BUCKET=your-project.appspot.com" >> .env
+    echo "REACT_APP_FIREBASE_MESSAGING_SENDER_ID=123456789" >> .env
+    echo "REACT_APP_FIREBASE_APP_ID=1:123456789:web:abc123" >> .env
+    echo "" >> .env
+    echo "Please edit frontend/.env and add your API keys"
+    echo "See FIREBASE_SETUP.md for Firebase configuration instructions"
 else
     # Check if .env has the old port 5000
     if grep -q "localhost:5000" .env 2>/dev/null; then
         echo "Warning: .env file contains port 5000. Updating to port 5001..."
         sed -i.bak 's|localhost:5000|localhost:5001|g' .env
         echo "Updated .env file. Please restart the frontend server."
+    fi
+    # Check if Firebase config is missing
+    if ! grep -q "REACT_APP_FIREBASE_API_KEY" .env 2>/dev/null; then
+        echo "Warning: Firebase configuration not found in .env"
+        echo "See FIREBASE_SETUP.md for setup instructions"
     fi
 fi
 

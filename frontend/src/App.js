@@ -112,8 +112,8 @@ function App() {
   }
 
   const handleStocksUpdate = (newStocks) => {
-    // Trigger a re-render of portfolio if it's open
-    // The PortfolioOverlay will pick up the change from the backend
+    // Firestore listeners handle updates automatically
+    // This is kept for compatibility but may not be needed
     window.dispatchEvent(new Event('stocksUpdated'));
   };
 

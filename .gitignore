@@ -41,3 +41,7 @@ Thumbs.db
 backend/articles_data.json
 backend/portfolios.json
 frontend/build/
+
+# Firebase (if you add service account keys)
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
