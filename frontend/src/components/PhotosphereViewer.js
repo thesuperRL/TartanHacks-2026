@@ -25,54 +25,117 @@ const PhotosphereViewer = ({ isOpen, onClose, articleTitle, location, lat, lng, 
             });
     }, [isOpen]);
 
-    // Initialize Street View panorama
+    // Initialize Street View panorama - only outdoor panoramas
     useEffect(() => {
         if (!isOpen || !googleMaps || !panoramaRef.current || !lat || !lng) return;
 
         console.log('Initializing Street View panorama at:', lat, lng);
 
-        try {
-            // Check if Street View is available at this location
+        const findOutdoorPanorama = (searchLat, searchLng, radius = 50, maxAttempts = 5) => {
             const streetViewService = new googleMaps.StreetViewService();
-            streetViewService.getPanorama(
-                { location: { lat, lng }, radius: 50 },
-                (data, status) => {
-                    if (status === 'OK' && data && data.location) {
-                        // Use the actual panorama location from the service
-                        const panoramaLocation = data.location.latLng;
+            let attempts = 0;
+            
+            const searchPanorama = (currentLat, currentLng, currentRadius) => {
+                attempts++;
+                
+                streetViewService.getPanorama(
+                    { location: { lat: currentLat, lng: currentLng }, radius: currentRadius },
+                    (data, status) => {
+                        if (status === 'OK' && data && data.location) {
+                            // Check if panorama is outdoor
+                            // Official Google Street View panoramas are typically outdoor
+                            // User-contributed panoramas (indoor) often have specific patterns
+                            const panoId = data.location.pano || '';
+                            const isUserContributed = panoId.startsWith('CAoS') || 
+                                                     panoId.startsWith('CB') ||
+                                                     data.location.source === 'user';
+                            
+                            // Official panoramas are almost always outdoor
+                            // Check if it's an official Google Street View panorama
+                            const isOfficial = !isUserContributed && 
+                                             (data.location.source === 'outdoor' || 
+                                              !data.location.source ||
+                                              panoId.length > 0);
+                            
+                            // Prefer official outdoor panoramas, reject user-contributed (often indoor)
+                            if (isOfficial && !isUserContributed) {
+                                // Use the actual panorama location from the service
+                                const panoramaLocation = data.location.latLng;
 
-                        // Initialize Street View panorama
-                        const panorama = new googleMaps.StreetViewPanorama(panoramaRef.current, {
-                            position: panoramaLocation,
-                            pov: { heading: 270, pitch: 0 },
-                            zoom: 1,
-                            visible: true,
-                            addressControl: false,
-                            linksControl: true,
-                            panControl: true,
-                            enableCloseButton: false,
-                            fullscreenControl: true,
-                            zoomControl: true
-                        });
+                                // Initialize Street View panorama
+                                const panorama = new googleMaps.StreetViewPanorama(panoramaRef.current, {
+                                    position: panoramaLocation,
+                                    pov: { heading: 270, pitch: 0 },
+                                    zoom: 1,
+                                    visible: true,
+                                    addressControl: false,
+                                    linksControl: true,
+                                    panControl: true,
+                                    enableCloseButton: false,
+                                    fullscreenControl: true,
+                                    zoomControl: true,
+                                    // Prefer outdoor imagery
+                                    imageDateControl: false
+                                });
 
-                        panorama.addListener('status_changed', () => {
-                            const panoStatus = panorama.getStatus();
-                            if (panoStatus === 'OK') {
+                                panorama.addListener('status_changed', () => {
+                                    const panoStatus = panorama.getStatus();
+                                    if (panoStatus === 'OK') {
+                                        // Double-check it's outdoor by checking panorama metadata
+                                        const currentPano = panorama.getPosition();
+                                        if (currentPano) {
+                                            setStreetViewLoaded(true);
+                                            console.log('Outdoor Street View loaded successfully');
+                                        }
+                                    } else {
+                                        setLoadingError('Street View imagery is not available at this location');
+                                        console.log('Street View status:', panoStatus);
+                                    }
+                                });
+
                                 setStreetViewLoaded(true);
-                                console.log('Street View loaded successfully');
+                                return;
                             } else {
-                                setLoadingError('Street View imagery is not available at this location');
-                                console.log('Street View status:', panoStatus);
+                                // This is likely an indoor panorama, search nearby
+                                if (attempts < maxAttempts) {
+                                    // Try searching in a wider radius with slight offset
+                                    const angle = (attempts * 72) * (Math.PI / 180); // Spread searches in circle
+                                    const offset = 0.001 * attempts; // ~100m per attempt
+                                    const newLat = searchLat + (offset * Math.cos(angle));
+                                    const newLng = searchLng + (offset * Math.sin(angle));
+                                    const newRadius = Math.min(currentRadius + 20, 200);
+                                    
+                                    console.log(`Indoor panorama detected, searching nearby (attempt ${attempts + 1})...`);
+                                    setTimeout(() => searchPanorama(newLat, newLng, newRadius), 100);
+                                } else {
+                                    setLoadingError('Only indoor Street View imagery available at this location. Outdoor imagery not found nearby.');
+                                }
                             }
-                        });
-
-                        setStreetViewLoaded(true);
-                    } else {
-                        setLoadingError('Street View imagery is not available at this location. Try a different location.');
-                        console.log('Street View not available:', status);
+                        } else {
+                            // No panorama found, try nearby if we haven't exhausted attempts
+                            if (attempts < maxAttempts) {
+                                const angle = (attempts * 72) * (Math.PI / 180);
+                                const offset = 0.001 * attempts;
+                                const newLat = searchLat + (offset * Math.cos(angle));
+                                const newLng = searchLng + (offset * Math.sin(angle));
+                                const newRadius = Math.min(currentRadius + 20, 200);
+                                
+                                console.log(`No panorama found, searching nearby (attempt ${attempts + 1})...`);
+                                setTimeout(() => searchPanorama(newLat, newLng, newRadius), 100);
+                            } else {
+                                setLoadingError('Street View imagery is not available at this location. Try a different location.');
+                                console.log('Street View not available:', status);
+                            }
+                        }
                     }
-                }
-            );
+                );
+            };
+            
+            searchPanorama(searchLat, searchLng, radius);
+        };
+
+        try {
+            findOutdoorPanorama(lat, lng);
         } catch (error) {
             console.error('Error initializing Street View:', error);
             setLoadingError(error.message || 'Failed to initialize Street View');
