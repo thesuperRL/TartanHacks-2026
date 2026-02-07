@@ -29,7 +29,7 @@ class OpenRouterClient:
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "HTTP-Referer": "https://github.com/your-repo",  # Optional: for analytics
-            "X-Title": "News Viewer App",  # Optional: for analytics
+            "X-Title": "Survey",  # Optional: for analytics
             "Content-Type": "application/json"
         }
         

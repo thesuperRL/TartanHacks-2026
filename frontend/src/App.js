@@ -578,7 +578,7 @@ function App() {
       
       <div className={`app-content ${!isAuthenticated ? 'blurred' : ''} ${!logoAnimationComplete ? 'hidden' : ''}`}>
         <div className="app-header">
-          <h1>🌍 Global News Explorer</h1>
+          <h1>Survey</h1>
           {isAuthenticated && (
             <>
               <ModeSelector selectedMode={mode} onModeChange={setMode} />

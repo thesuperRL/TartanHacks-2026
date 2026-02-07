@@ -122,7 +122,7 @@ const LogoAnimation = ({ onComplete }) => {
             </defs>
           </svg>
         </div>
-        <div ref={logoTextRef} className="logo-text">Global News Explorer</div>
+        <div ref={logoTextRef} className="logo-text">Survey</div>
       </div>
     </div>
   );
