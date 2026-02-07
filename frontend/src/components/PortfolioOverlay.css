@@ -170,7 +170,8 @@
 
 .stock-item {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 16px;
   background: rgba(255, 255, 255, 0.05);
@@ -185,6 +186,18 @@
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   -webkit-transform: translateX(-50px) translateZ(0);
+}
+
+.stock-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.stock-item .stock-prediction {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .stock-item.animate-in {

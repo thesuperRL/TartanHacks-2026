@@ -200,3 +200,27 @@
   background: linear-gradient(135deg, #5aaeff 0%, #4a9eff 100%);
   transform: translateY(-2px);
 }
+
+/* Company markers */
+.company-marker {
+  cursor: pointer;
+}
+
+.company-marker:hover {
+  z-index: 1000 !important;
+}
+
+/* Company popup styles */
+.company-popup .mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(135deg, rgba(15, 12, 41, 0.98) 0%, rgba(48, 43, 99, 0.98) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  max-width: 460px !important;
+  overflow: hidden;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

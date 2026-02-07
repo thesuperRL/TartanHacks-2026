@@ -4,6 +4,7 @@ from news_scraper import NewsScraper
 from news_processor import NewsProcessor
 from stock_prediction import StockPredictor
 from portfolio_predictor import PortfolioPredictor
+from company_data import CompanyDataProvider
 import os
 import asyncio
 import json
@@ -33,6 +34,7 @@ scraper = NewsScraper()
 processor = NewsProcessor()
 stock_predictor = StockPredictor()
 portfolio_predictor = PortfolioPredictor()
+company_data_provider = CompanyDataProvider()
 
 # DEPRECATED: Authentication and portfolio storage moved to Firebase
 # Keeping these for backward compatibility, but they're no longer used
@@ -1426,6 +1428,138 @@ CRITICAL: You MUST include an impact entry for EVERY stock in the portfolio: {',
         print(f"Error generating knowledge graph: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+# ============== COMPANY DATA ENDPOINTS ==============
+
+@app.route('/api/companies/top', methods=['GET', 'OPTIONS'])
+@cross_origin()
+def get_top_companies():
+    """Get top 20 global companies with their locations and stock data"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        companies = company_data_provider.get_top_companies()
+        return jsonify({
+            'status': 'success',
+            'companies': companies,
+            'count': len(companies)
+        }), 200
+    except Exception as e:
+        print(f"Error fetching top companies: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/companies/<symbol>/chart', methods=['GET', 'OPTIONS'])
+@cross_origin()
+def get_company_chart(symbol):
+    """Get weekly stock price and revenue data for a company (1 year)"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        symbol = symbol.upper()
+        chart_data = company_data_provider.get_company_chart_data(symbol)
+        
+        if 'error' in chart_data:
+            return jsonify({
+                'status': 'error',
+                'message': chart_data['error']
+            }), 404
+        
+        return jsonify({
+            'status': 'success',
+            'data': chart_data
+        }), 200
+    except Exception as e:
+        print(f"Error fetching chart data for {symbol}: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/companies/lesser-known', methods=['GET', 'OPTIONS'])
+@cross_origin()
+def get_lesser_known_companies():
+    """Get lesser-known companies with stock prices"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        companies = company_data_provider.get_lesser_known_companies()
+        return jsonify({
+            'status': 'success',
+            'companies': companies,
+            'count': len(companies)
+        }), 200
+    except Exception as e:
+        print(f"Error fetching lesser-known companies: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@app.route('/api/companies/recommendations', methods=['GET', 'OPTIONS'])
+@cross_origin()
+def get_investment_recommendations():
+    """Get AI-powered investment recommendations for lesser-known companies"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        # Get portfolio stocks from query parameter (comma-separated symbols)
+        portfolio_param = request.args.get('portfolio', '')
+        portfolio_symbols = [s.strip().upper() for s in portfolio_param.split(',') if s.strip()]
+        
+        # First get the lesser-known companies data
+        companies = company_data_provider.get_lesser_known_companies()
+        
+        # Get portfolio stocks data if provided
+        portfolio_stocks = []
+        if portfolio_symbols:
+            portfolio_stocks = company_data_provider.get_portfolio_stocks_data(portfolio_symbols)
+        
+        # Then get AI recommendations
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            recommendations = loop.run_until_complete(
+                company_data_provider.get_investment_recommendations(companies, portfolio_stocks)
+            )
+        finally:
+            # Properly shutdown the event loop to handle pending async tasks
+            try:
+                # Cancel all pending tasks
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                # Give tasks a chance to clean up
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            finally:
+                loop.close()
+        
+        return jsonify({
+            'status': 'success',
+            'recommendations': recommendations,
+            'companiesAnalyzed': len(companies)
+        }), 200
+    except Exception as e:
+        import traceback
+        print(f"Error getting recommendations: {e}")
+        print(traceback.format_exc())
         return jsonify({
             'status': 'error',
             'message': str(e)

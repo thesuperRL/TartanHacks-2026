@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { db } from './config/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { generateDemoArticles } from './utils/generateDemoArticles';
 import MapViewer from './components/MapViewer';
 import Sidebar from './components/Sidebar';
@@ -169,6 +169,7 @@ function App() {
   const [userStocks, setUserStocks] = useState(['TSLA']);
   const [portfolio, setPortfolio] = useState([]);
   const [stocks, setStocks] = useState([]);
+  const [mapActivePanel, setMapActivePanel] = useState('news'); // 'news' or 'companies'
   const prevAuthenticatedRef = useRef(null);
   const hasAnimatedStartup = useRef(false);
 
@@ -194,6 +195,54 @@ function App() {
 
     return () => unsubscribe();
   }, [isAuthenticated, user?.uid]);
+
+  // Add stock to portfolio
+  const handleAddStockToPortfolio = async (symbol) => {
+    if (!user?.uid || !symbol) return;
+    
+    const upperSymbol = symbol.toUpperCase();
+    
+    // Check if already in portfolio
+    if (portfolio.some(s => (s.symbol || s).toUpperCase() === upperSymbol)) {
+      console.log(`${upperSymbol} is already in portfolio`);
+      return;
+    }
+    
+    try {
+      const newStocks = [
+        ...portfolio,
+        {
+          symbol: upperSymbol,
+          name: upperSymbol,
+          price: 0,
+          change: 0
+        }
+      ];
+      
+      const portfolioRef = doc(db, 'portfolios', user.uid);
+      await setDoc(portfolioRef, { stocks: newStocks }, { merge: true });
+      console.log(`Added ${upperSymbol} to portfolio`);
+    } catch (error) {
+      console.error('Error adding stock to portfolio:', error);
+    }
+  };
+
+  // Remove stock from portfolio
+  const handleRemoveStockFromPortfolio = async (symbol) => {
+    if (!user?.uid || !symbol) return;
+    
+    const upperSymbol = symbol.toUpperCase();
+    
+    try {
+      const newStocks = portfolio.filter(s => (s.symbol || s).toUpperCase() !== upperSymbol);
+      
+      const portfolioRef = doc(db, 'portfolios', user.uid);
+      await setDoc(portfolioRef, { stocks: newStocks }, { merge: true });
+      console.log(`Removed ${upperSymbol} from portfolio`);
+    } catch (error) {
+      console.error('Error removing stock from portfolio:', error);
+    }
+  };
 
   // Update demo articles and default articles when mode changes
   useEffect(() => {
@@ -265,6 +314,26 @@ function App() {
       }
     }
   }, [authLoading, isAuthenticated, logoAnimationComplete]);
+
+  // Re-animate sidebar and map when returning from Knowledge Graph
+  useEffect(() => {
+    if (!showKnowledgeGraph && isAuthenticated && hasAnimatedStartup.current) {
+      // Small delay to ensure DOM elements are mounted
+      const timer = setTimeout(() => {
+        const sidebar = document.querySelector('.sidebar');
+        const mapContainer = document.querySelector('.map-container');
+        
+        if (sidebar && !sidebar.classList.contains('animate-in')) {
+          sidebar.classList.add('animate-in');
+        }
+        if (mapContainer && !mapContainer.classList.contains('animate-in')) {
+          mapContainer.classList.add('animate-in');
+        }
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showKnowledgeGraph, isAuthenticated]);
 
   // Login animations - using CSS classes for performance
   useEffect(() => {
@@ -615,6 +684,10 @@ function App() {
                   onPredictionMinimize={setPredictionMinimized}
                   portfolio={portfolio}
                   stocks={stocks}
+                  activePanel={mapActivePanel}
+                  onAddStock={handleAddStockToPortfolio}
+                  onRemoveStock={handleRemoveStockFromPortfolio}
+                  mode={mode}
                 />
                 <div className="map-container">
                   <MapViewer 
@@ -624,6 +697,8 @@ function App() {
                     portfolio={portfolio}
                     stocks={stocks}
                     mode={mode}
+                    activePanel={mapActivePanel}
+                    onPanelChange={setMapActivePanel}
                   />
                 </div>
               </>

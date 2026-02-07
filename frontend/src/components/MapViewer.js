@@ -3,11 +3,15 @@ import { loadMapbox } from '../utils/loadMapbox';
 import PhotosphereViewer from './PhotosphereViewer';
 import MindMapModal from './MindMapModal';
 import PodcastPlayer from './PodcastPlayer';
+import MapPanelToggle from './MapPanelToggle';
+import CompanyHoverChart from './CompanyHoverChart';
 import { generateDemoArticles } from '../utils/generateDemoArticles';
 import { checkArticleImpact } from '../utils/checkArticleImpact';
 import './MapViewer.css';
 
-const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [], mode = 'economic' }) => {
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+
+const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [], mode = 'economic', activePanel = 'news', onPanelChange }) => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [mapbox, setMapbox] = useState(null);
@@ -21,10 +25,41 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   const [mapBounds, setMapBounds] = useState(null);
   const [demoArticles, setDemoArticles] = useState(() => generateDemoArticles(mode));
   
+  // Company data state (activePanel is now a prop)
+  const [topCompanies, setTopCompanies] = useState([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const companyMarkersRef = useRef([]);
+  
+  // Hover chart state - pinned means it stays visible and can be dragged
+  const [hoverChart, setHoverChart] = useState({ visible: false, pinned: false, symbol: null, name: null, x: 0, y: 0 });
+  
   // Update demo articles when mode changes
   useEffect(() => {
     setDemoArticles(generateDemoArticles(mode));
   }, [mode]);
+  
+  // Fetch top companies when switching to companies panel
+  useEffect(() => {
+    if (activePanel === 'companies' && topCompanies.length === 0) {
+      fetchTopCompanies();
+    }
+  }, [activePanel]);
+  
+  const fetchTopCompanies = async () => {
+    try {
+      setCompaniesLoading(true);
+      const response = await fetch(`${API_BASE_URL}/companies/top`);
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        setTopCompanies(data.companies);
+      }
+    } catch (err) {
+      console.error('Error fetching top companies:', err);
+    } finally {
+      setCompaniesLoading(false);
+    }
+  };
 
   // Modal states
   const [photosphereOpen, setPhotosphereOpen] = useState(false);
@@ -84,6 +119,42 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: true
       }), 'top-right');
+      
+      // Add custom Home button control
+      class HomeControl {
+        onAdd(map) {
+          this._map = map;
+          this._container = document.createElement('div');
+          this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+          
+          const button = document.createElement('button');
+          button.className = 'mapboxgl-ctrl-home';
+          button.type = 'button';
+          button.title = 'Reset to default view';
+          button.innerHTML = '🏠';
+          button.style.cssText = 'font-size: 18px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: #fff; border: none;';
+          
+          button.addEventListener('click', () => {
+            map.flyTo({
+              center: [0, 20],
+              zoom: 2,
+              pitch: 0,
+              bearing: 0,
+              duration: 1500
+            });
+          });
+          
+          this._container.appendChild(button);
+          return this._container;
+        }
+        
+        onRemove() {
+          this._container.parentNode.removeChild(this._container);
+          this._map = undefined;
+        }
+      }
+      
+      mapInstance.addControl(new HomeControl(), 'top-right');
 
       mapRef.current = mapInstance;
 
@@ -303,6 +374,16 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   // Update markers when articles change, zoom changes, or mode changes
   useEffect(() => {
     if (!mapRef.current || !mapbox || !mapLoaded) return;
+    
+    // Only show article markers when in news panel
+    if (activePanel !== 'news') {
+      // Hide existing article markers
+      markersRef.current.forEach(marker => {
+        const el = marker.getElement();
+        if (el) el.style.display = 'none';
+      });
+      return;
+    }
 
     const map = mapRef.current;
     const mapboxgl = window.mapboxgl || mapbox;
@@ -744,7 +825,135 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       popupsRef.current.push(popup);
     });
 
-  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, mapBounds, demoArticles, stocks, portfolio, mode]);
+  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, mapBounds, demoArticles, stocks, portfolio, mode, activePanel]);
+
+  // Update company markers when companies panel is active
+  useEffect(() => {
+    if (!mapRef.current || !mapbox || !mapLoaded || activePanel !== 'companies') {
+      // Clear company markers when not in companies panel
+      companyMarkersRef.current.forEach(marker => marker.remove());
+      companyMarkersRef.current = [];
+      return;
+    }
+
+    const map = mapRef.current;
+    const mapboxgl = window.mapboxgl || mapbox;
+
+    // Clear existing company markers
+    companyMarkersRef.current.forEach(marker => marker.remove());
+    companyMarkersRef.current = [];
+
+    // Hide article markers when in companies mode
+    markersRef.current.forEach(marker => {
+      const el = marker.getElement();
+      if (el) el.style.display = 'none';
+    });
+
+    // Add company markers
+    topCompanies.forEach(company => {
+      if (!company.headquarters?.lat || !company.headquarters?.lng) return;
+
+      const { lat, lng } = company.headquarters;
+      const coordinates = [lng, lat];
+
+      // Create company marker element
+      const el = document.createElement('div');
+      el.className = 'company-marker';
+      el.style.cssText = 'width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+
+      const innerEl = document.createElement('div');
+      const isPositive = company.changePercent >= 0;
+      innerEl.style.cssText = `
+        width:32px;height:32px;border-radius:50%;border:3px solid white;
+        box-shadow:0 4px 12px rgba(0,0,0,0.4);
+        background:${isPositive ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#ef4444,#dc2626)'};
+        transition:transform 0.2s,box-shadow 0.2s;
+        display:flex;align-items:center;justify-content:center;
+        font-size:12px;font-weight:bold;color:white;
+      `;
+      innerEl.textContent = company.symbol.substring(0, 2);
+      el.appendChild(innerEl);
+
+      // Hover effects
+      el.addEventListener('mouseenter', (e) => {
+        innerEl.style.transform = 'scale(1.4)';
+        innerEl.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+        
+        // If any chart is pinned, ignore hover events completely
+        setHoverChart(prev => {
+          if (prev.pinned) {
+            return prev; // Don't change anything when a chart is pinned
+          }
+          // Show chart for this company on hover (always fixed position)
+          return {
+            visible: true,
+            pinned: false,
+            symbol: company.symbol,
+            name: company.name,
+            x: 0,
+            y: 0
+          };
+        });
+      });
+
+      el.addEventListener('mouseleave', () => {
+        innerEl.style.transform = 'scale(1)';
+        innerEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+        
+        // If pinned, don't hide on mouseleave
+        setHoverChart(prev => {
+          if (prev.pinned) {
+            return prev; // Keep visible if any chart is pinned
+          }
+          // Hide chart when mouse leaves
+          return { visible: false, pinned: false, symbol: null, name: null, x: 0, y: 0 };
+        });
+      });
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        // Pin the chart for this company in fixed top-right position
+        setHoverChart({
+          visible: true,
+          pinned: true,
+          symbol: company.symbol,
+          name: company.name,
+          x: 0, // Not used for pinned - fixed position in CSS
+          y: 0
+        });
+        
+        // Fly to company location
+        map.flyTo({
+          center: coordinates,
+          zoom: 12,
+          duration: 1000
+        });
+      });
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      companyMarkersRef.current.push(marker);
+    });
+
+    // Show article markers when switching back
+    return () => {
+      markersRef.current.forEach(marker => {
+        const el = marker.getElement();
+        if (el) el.style.display = '';
+      });
+    };
+  }, [mapbox, mapLoaded, activePanel, topCompanies]);
+
+  // Handle panel change
+  const handlePanelChange = (panel) => {
+    if (onPanelChange) {
+      onPanelChange(panel);
+    }
+    setHoverChart({ visible: false, pinned: false, symbol: null, name: null, x: 0, y: 0 });
+  };
 
   return (
     <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>
@@ -760,6 +969,60 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
         </div>
       )}
       <div ref={mapContainerRef} className="mapbox-map-container" style={{ width:'100%',height:'100%',minHeight:'400px',position:'absolute',top:0,left:0,zIndex:1 }} />
+
+      {/* Panel Toggle */}
+      <MapPanelToggle 
+        activePanel={activePanel} 
+        onPanelChange={handlePanelChange}
+      />
+
+      {/* Loading indicator for companies */}
+      {activePanel === 'companies' && companiesLoading && (
+        <div style={{
+          position: 'absolute',
+          top: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 12, 41, 0.9)',
+          padding: '12px 24px',
+          borderRadius: '12px',
+          color: '#fff',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <div style={{
+            width: '16px',
+            height: '16px',
+            border: '2px solid rgba(139, 92, 246, 0.3)',
+            borderTopColor: '#8b5cf6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          Loading company data...
+        </div>
+      )}
+
+      {/* Hover Chart for Companies - Always fixed position top-right */}
+      {hoverChart.visible && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 100,
+            right: 20,
+            zIndex: 10000,
+            pointerEvents: 'auto'
+          }}
+        >
+          <CompanyHoverChart 
+            symbol={hoverChart.symbol}
+            name={hoverChart.name}
+            isPinned={hoverChart.pinned}
+            onClose={() => setHoverChart({ visible: false, pinned: false, symbol: null, name: null, x: 0, y: 0 })}
+          />
+        </div>
+      )}
 
       <PhotosphereViewer
         isOpen={photosphereOpen}

@@ -15,6 +15,7 @@ const PortfolioOverlay = ({ isWindow = false }) => {
   const stocksListRef = useRef(null);
   const stockSymbolsRef = useRef([]);
   const [stockSymbolsString, setStockSymbolsString] = useState('');
+  const animatedStocksRef = useRef(new Set());
   const [predictions, setPredictions] = useState({});
   const [predictionsLoading, setPredictionsLoading] = useState(false);
   const [expandedStock, setExpandedStock] = useState(null);
@@ -66,18 +67,27 @@ const PortfolioOverlay = ({ isWindow = false }) => {
     }
   };
 
-  // Animate stocks flying in from left when loading completes
+  // Animate stocks flying in from left when loading completes or new stocks added
   useEffect(() => {
-    if (!loading && stocks.length > 0 && !hasAnimated) {
-      setHasAnimated(true);
-      const stockItems = stocksListRef.current?.querySelectorAll('.stock-item');
-      if (stockItems) {
-        stockItems.forEach((item, index) => {
-          setTimeout(() => {
-            item.classList.add('animate-in');
-          }, index * 100);
-        });
-      }
+    if (!loading && stocks.length > 0) {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        const stockItems = stocksListRef.current?.querySelectorAll('.stock-item');
+        if (stockItems) {
+          stockItems.forEach((item, index) => {
+            const symbol = stocks[index]?.symbol;
+            if (symbol && !animatedStocksRef.current.has(symbol)) {
+              animatedStocksRef.current.add(symbol);
+              setTimeout(() => {
+                item.classList.add('animate-in');
+              }, hasAnimated ? 50 : index * 100); // Faster animation for new items
+            }
+          });
+        }
+        if (!hasAnimated) {
+          setHasAnimated(true);
+        }
+      }, 0);
     }
   }, [loading, stocks, hasAnimated]);
 
@@ -437,11 +447,6 @@ const PortfolioOverlay = ({ isWindow = false }) => {
           <button onClick={handleAddStock}>Add</button>
         </div>
         {/* Debug info - remove after debugging */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', padding: '8px', background: 'rgba(0,0,0,0.2)', marginBottom: '8px', borderRadius: '4px' }}>
-            Debug: Predictions loaded: {Object.keys(predictions).length}, Loading: {predictionsLoading ? 'Yes' : 'No'}, Stocks: {stocks.length}
-          </div>
-        )}
 
         <div className="stocks-list" ref={stocksListRef}>
           {loading ? (
@@ -475,47 +480,17 @@ const PortfolioOverlay = ({ isWindow = false }) => {
               
               return (
               <div key={stock.symbol} className="stock-item">
-                <div className="stock-info">
-                  <div className="stock-symbol">{stock.symbol}</div>
-                  <div className="stock-name">{stock.name}</div>
+                <div className="stock-item-main">
+                  <div className="stock-info">
+                    <div className="stock-symbol">{stock.symbol}</div>
+                    <div className="stock-name">{stock.name}</div>
                     {prediction && (
-                      <div className="stock-prediction">
-                        <div 
-                          className={`prediction-badge ${prediction.predictedChange >= 0 ? 'positive' : 'negative'}`}
-                          onClick={() => setExpandedStock(isExpanded ? null : stock.symbol)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          📈 Predicted: {prediction.predictedChange >= 0 ? '+' : ''}{prediction.predictedChange}%
-                        </div>
-                        <div className={`prediction-details ${isExpanded ? 'expanded' : ''}`}>
-                          {isExpanded && (
-                            <>
-                              <div className="prediction-price">
-                                Predicted Price: ${prediction.predictedPrice}
-                              </div>
-                              {prediction.predictedPrices && prediction.predictedPrices.length > 0 && (
-                              <div className="prediction-chart">
-                                <StockPriceChart
-                                  symbol={stock.symbol}
-                                  historicalPrices={prediction.historicalPrices || []}
-                                  predictedPrices={prediction.predictedPrices || []}
-                                  explanation={prediction.explanation || ''}
-                                />
-                              </div>
-                            )}
-                            {prediction.explanation && (
-                              <div className="prediction-explanation">
-                                {prediction.explanation}
-                              </div>
-                            )}
-                            {prediction.newsScraped && (
-                              <div className="prediction-source">
-                                ✓ Based on recent news analysis
-                              </div>
-                            )}
-                            </>
-                          )}
-                        </div>
+                      <div 
+                        className={`prediction-badge ${prediction.predictedChange >= 0 ? 'positive' : 'negative'}`}
+                        onClick={() => setExpandedStock(isExpanded ? null : stock.symbol)}
+                        style={{ cursor: 'pointer', marginTop: '6px' }}
+                      >
+                        📈 Predicted: {prediction.predictedChange >= 0 ? '+' : ''}{prediction.predictedChange}%
                       </div>
                     )}
                     {predictionsLoading && !prediction && (
@@ -526,7 +501,7 @@ const PortfolioOverlay = ({ isWindow = false }) => {
                         No predictions available yet
                       </div>
                     )}
-                </div>
+                  </div>
                   <div className="stock-price">
                     <div className="price">
                       {stock.price && stock.price > 0 
@@ -539,12 +514,46 @@ const PortfolioOverlay = ({ isWindow = false }) => {
                       </div>
                     )}
                   </div>
-                <button 
-                  className="remove-stock"
-                  onClick={() => handleRemoveStock(stock.symbol)}
-                >
-                  ×
-                </button>
+                  <button 
+                    className="remove-stock"
+                    onClick={() => handleRemoveStock(stock.symbol)}
+                  >
+                    ×
+                  </button>
+                </div>
+                {prediction && (
+                  <div className="stock-prediction">
+                    <div className={`prediction-details ${isExpanded ? 'expanded' : ''}`}>
+                      {isExpanded && (
+                        <>
+                          <div className="prediction-price">
+                            Predicted Price: ${prediction.predictedPrice}
+                          </div>
+                          {prediction.predictedPrices && prediction.predictedPrices.length > 0 && (
+                          <div className="prediction-chart">
+                            <StockPriceChart
+                              symbol={stock.symbol}
+                              historicalPrices={prediction.historicalPrices || []}
+                              predictedPrices={prediction.predictedPrices || []}
+                              explanation={prediction.explanation || ''}
+                            />
+                          </div>
+                          )}
+                          {prediction.explanation && (
+                            <div className="prediction-explanation">
+                              {prediction.explanation}
+                            </div>
+                          )}
+                          {prediction.newsScraped && (
+                            <div className="prediction-source">
+                              ✓ Based on recent news analysis
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               );
             })

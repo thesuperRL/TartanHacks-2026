@@ -182,6 +182,21 @@
   pointer-events: none;
 }
 
+/* Political mode - full height articles */
+.sidebar-section.political-articles {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-section.political-articles .sidebar-section-content {
+  flex: 1;
+  overflow-y: auto;
+  max-height: none !important;
+}
+
 /* Scrollbar styling */
 .sidebar::-webkit-scrollbar {
   width: 8px;
