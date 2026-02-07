@@ -1179,6 +1179,198 @@ Respond with ONLY a JSON object:
             'impacts_holdings': impacts
         }), 200
 
+@app.route('/api/knowledge-graph', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def generate_knowledge_graph():
+    """
+    Generate a knowledge graph from an article URL.
+    Analyzes the article and creates a graph showing events, impacts, and reasoning.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Request body must contain JSON data'
+            }), 400
+        
+        article_url = data.get('article_url')
+        portfolio_stocks = data.get('portfolio_stocks', [])
+        
+        if not article_url:
+            return jsonify({
+                'status': 'error',
+                'message': 'article_url is required'
+            }), 400
+        
+        # Scrape article content
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(article_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extract title
+            title = soup.find('title')
+            title_text = title.get_text().strip() if title else 'Article'
+            
+            # Extract main content
+            article_text = ''
+            for tag in soup.find_all(['p', 'article', 'div']):
+                text = tag.get_text().strip()
+                if len(text) > 50:  # Only include substantial paragraphs
+                    article_text += text + ' '
+            
+            # Limit article text length
+            article_text = article_text[:5000]
+            
+        except Exception as e:
+            print(f"Error scraping article: {e}")
+            # Use URL and basic info if scraping fails
+            title_text = article_url
+            article_text = f"Article from {article_url}"
+        
+        # Use OpenAI to analyze the article and generate knowledge graph data
+        try:
+            from openai import OpenAI
+            import os
+            
+            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            
+            stocks_str = ', '.join(portfolio_stocks) if portfolio_stocks else 'None'
+            
+            if not portfolio_stocks:
+                # If no stocks, still analyze but note it
+                prompt = f"""Analyze this article and create a knowledge graph structure.
+
+Article Title: {title_text}
+Article Content: {article_text[:3000]}
+User Portfolio Stocks: None (user has no stocks in portfolio)
+
+Extract and structure:
+1. Key events that happened (2-4 events)
+2. General market implications
+3. Reasoning for potential impacts
+
+Return ONLY valid JSON in this exact format:
+{{
+    "article": {{
+        "title": "article title",
+        "summary": "brief summary"
+    }},
+    "events": ["event 1", "event 2", "event 3"],
+    "impacts": [],
+    "reasoning": ["reason 1", "reason 2"]
+}}"""
+            else:
+                # Always generate impacts for each stock in portfolio
+                prompt = f"""Analyze this article and create a knowledge graph structure. You MUST analyze how this article impacts EACH stock in the user's portfolio, even if the connection is indirect.
+
+Article Title: {title_text}
+Article Content: {article_text[:3000]}
+User Portfolio Stocks: {', '.join(portfolio_stocks)}
+
+IMPORTANT: You MUST provide an impact analysis for EACH stock in the portfolio ({', '.join(portfolio_stocks)}). Even if the article doesn't directly mention these stocks, analyze:
+- Indirect impacts (sector effects, market sentiment, regulatory changes, economic implications)
+- How the events in the article could affect each company
+- Potential ripple effects through the market
+
+For each stock, determine:
+- Type: positive (if likely to benefit), negative (if likely to be hurt), or neutral (if minimal impact)
+- Description: Specific explanation of how this article/event impacts the stock
+- Reasoning: Why this impact occurs (even if indirect)
+
+Extract and structure:
+1. Key events that happened (2-4 events)
+2. How these events impact EACH of the user's portfolio stocks (REQUIRED - one impact per stock)
+3. Reasoning for why these impacts occur
+
+Return ONLY valid JSON in this exact format:
+{{
+    "article": {{
+        "title": "article title",
+        "summary": "brief summary"
+    }},
+    "events": ["event 1", "event 2", "event 3"],
+    "impacts": [
+        {{
+            "stock": "AAPL",
+            "type": "positive/negative/neutral",
+            "description": "specific explanation of how this impacts AAPL",
+            "reasoning": "detailed reasoning for why this impact occurs, even if indirect"
+        }},
+        {{
+            "stock": "GOOGL",
+            "type": "positive/negative/neutral",
+            "description": "specific explanation of how this impacts GOOGL",
+            "reasoning": "detailed reasoning for why this impact occurs, even if indirect"
+        }}
+    ],
+    "reasoning": ["reason 1", "reason 2"]
+}}
+
+CRITICAL: You MUST include an impact entry for EVERY stock in the portfolio: {', '.join(portfolio_stocks)}. Do not leave any stock out. If the connection is indirect, explain the indirect relationship clearly."""
+            
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a financial analyst. Always return valid JSON only, no markdown. You MUST analyze impacts for every stock in the user's portfolio, even if the connection is indirect."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000  # Increased to accommodate detailed impacts for each stock
+            )
+            
+            result_text = response.choices[0].message.content.strip()
+            # Remove markdown code blocks if present
+            if result_text.startswith('```'):
+                result_text = result_text.split('```')[1]
+                if result_text.startswith('json'):
+                    result_text = result_text[4:]
+            
+            result = json.loads(result_text)
+            
+            return jsonify({
+                'status': 'success',
+                'article': result.get('article', {'title': title_text, 'summary': ''}),
+                'events': result.get('events', []),
+                'impacts': result.get('impacts', []),
+                'reasoning': result.get('reasoning', [])
+            }), 200
+            
+        except Exception as e:
+            print(f"Error with OpenAI analysis: {e}")
+            # Fallback: generate basic structure
+            return jsonify({
+                'status': 'success',
+                'article': {
+                    'title': title_text,
+                    'summary': article_text[:200] + '...' if len(article_text) > 200 else article_text
+                },
+                'events': ['Article analyzed', 'Content extracted'],
+                'impacts': [],
+                'reasoning': ['Article analysis completed']
+            }), 200
+        
+    except Exception as e:
+        print(f"Error generating knowledge graph: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 
 if __name__ == '__main__':
     # Use port 5004 to avoid conflict with macOS AirPlay Receiver on port 5000
