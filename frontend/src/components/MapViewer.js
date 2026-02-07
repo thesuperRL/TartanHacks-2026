@@ -59,6 +59,17 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   // Initialize map once Mapbox is loaded
   useEffect(() => {
     if (!mapbox || !mapContainerRef.current || mapRef.current) return;
+    
+    // Ensure container is visible and has dimensions before initializing
+    const container = mapContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    if (!container || (rect.width === 0 && rect.height === 0)) {
+      // Container not ready yet, wait a bit and try again
+      const timer = setTimeout(() => {
+        // This will trigger the effect again if container becomes ready
+      }, 100);
+      return () => clearTimeout(timer);
+    }
 
     console.log('Initializing Mapbox map...');
 
@@ -70,7 +81,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       }
 
       const mapInstance = new mapboxgl.Map({
-        container: mapContainerRef.current,
+        container: container,
         style: 'mapbox://styles/mapbox/dark-v11',
         center: [0, 20],
         zoom: 2,
@@ -288,10 +299,45 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
 
       mapInstance.on('style.load', applyThemeColors);
 
-      window.addEventListener('resize', () => mapInstance.resize());
+      const handleResize = () => {
+        if (mapInstance && container && container.offsetWidth > 0 && container.offsetHeight > 0) {
+          try {
+            mapInstance.resize();
+          } catch (e) {
+            console.warn('Error resizing map:', e);
+          }
+        }
+      };
+      
+      window.addEventListener('resize', handleResize);
+      
+      // Use ResizeObserver to detect when container becomes visible
+      let resizeObserver;
+      if (window.ResizeObserver && container) {
+        resizeObserver = new ResizeObserver(() => {
+          if (mapInstance && container && container.offsetWidth > 0 && container.offsetHeight > 0) {
+            try {
+              mapInstance.resize();
+            } catch (e) {
+              console.warn('Error resizing map from ResizeObserver:', e);
+            }
+          }
+        });
+        resizeObserver.observe(container);
+      }
 
       return () => {
-        if (mapInstance) mapInstance.remove();
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+        window.removeEventListener('resize', handleResize);
+        if (mapInstance) {
+          try {
+            mapInstance.remove();
+          } catch (e) {
+            console.warn('Error removing map:', e);
+          }
+        }
         mapRef.current = null;
       };
     } catch (error) {
@@ -299,6 +345,34 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       setLoadingError(error.message);
     }
   }, [mapbox]);
+
+  // Handle map resize when container becomes visible (e.g., after toggling from knowledge graph)
+  useEffect(() => {
+    if (!mapRef.current || !mapContainerRef.current) return;
+    
+    const checkVisibility = () => {
+      const container = mapContainerRef.current;
+      if (container && mapRef.current) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          // Container is visible, trigger resize
+          try {
+            mapRef.current.resize();
+          } catch (e) {
+            console.warn('Error resizing map on visibility change:', e);
+          }
+        }
+      }
+    };
+    
+    // Check immediately
+    checkVisibility();
+    
+    // Also check after a short delay to catch delayed renders
+    const timer = setTimeout(checkVisibility, 200);
+    
+    return () => clearTimeout(timer);
+  }, [mapLoaded]); // Re-run when map loads or when component becomes visible
 
   // Update markers when articles change, zoom changes, or mode changes
   useEffect(() => {
@@ -342,8 +416,11 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
         
         // Get the map container dimensions
         const container = map.getContainer();
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
+        if (!container) {
+          return false;
+        }
+        const width = container.offsetWidth || 0;
+        const height = container.offsetHeight || 0;
         
         // Check if the point is within the visible viewport
         // Use tighter padding to prevent markers on the back of the globe

@@ -11,7 +11,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from openai import OpenAI
+from openrouter_client import OpenRouterClient
 import tempfile
 import subprocess
 from pathlib import Path
@@ -747,9 +747,10 @@ def search_articles():
                 'message': 'Query and articles are required'
             }), 400
         
-        # Use OpenAI for semantic search
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
+        # Use OpenRouter for semantic search
+        try:
+            client = OpenRouterClient()
+        except ValueError:
             # Fallback to text search
             filtered = [a for a in articles if query.lower() in (a.get('title', '') + ' ' + a.get('summary', '')).lower()]
             return jsonify({
@@ -757,8 +758,6 @@ def search_articles():
                 'articles': filtered,
                 'explanation': None
             }), 200
-        
-        client = OpenAI(api_key=api_key)
         
         # Create article summaries for AI
         article_summaries = []
@@ -780,8 +779,8 @@ Format:
     "explanation": "These articles match because..."
 }}"""
         
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        response = client.chat_completions_create(
+            model=None,  # Uses default free model
             messages=[
                 {"role": "system", "content": "You are a financial news search assistant. Always return valid JSON."},
                 {"role": "user", "content": prompt}
@@ -828,14 +827,13 @@ def generate_daily_digest_video():
         predictions = data.get('predictions')
         
         # Generate video script using AI
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
+        try:
+            client = OpenRouterClient()
+        except ValueError:
             return jsonify({
                 'status': 'error',
-                'message': 'OpenAI API key not configured'
+                'message': 'OpenRouter API key not configured. Please set OPENROUTER_API_KEY environment variable.'
             }), 500
-        
-        client = OpenAI(api_key=api_key)
         
         # Build portfolio summary
         portfolio_summary = []
@@ -871,8 +869,8 @@ Create an engaging, professional script that:
 
 Format as a clear script with natural speech patterns."""
         
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        response = client.chat_completions_create(
+            model=None,  # Uses default free model
             messages=[
                 {"role": "system", "content": "You are a financial news anchor creating a daily digest script."},
                 {"role": "user", "content": prompt}
@@ -883,40 +881,37 @@ Format as a clear script with natural speech patterns."""
         
         script = response.choices[0].message.content
         
-        # Generate audio using OpenAI TTS
+        # Generate audio using Google TTS (free alternative)
         try:
-            print("Generating audio with OpenAI TTS...")
+            print("Generating audio with Google TTS...")
             print(f"Script length: {len(script)} characters")
             
-            audio_response = client.audio.speech.create(
-                model="tts-1",
-                voice="alloy",  # Options: alloy, echo, fable, onyx, nova, shimmer
-                input=script[:4000]  # Limit to 4000 characters for TTS
-            )
+            # Use Google TTS via gTTS library (free)
+            try:
+                from gtts import gTTS
+                import io
+                
+                # Create TTS audio
+                tts = gTTS(text=script[:4000], lang='en', slow=False)
+                audio_bytes = io.BytesIO()
+                tts.write_to_fp(audio_bytes)
+                audio_bytes.seek(0)
+                audio_content = audio_bytes.read()
+            except ImportError:
+                # Fallback: return script only if gTTS not available
+                raise Exception("gTTS library not installed. Install with: pip install gtts")
             
             # Save audio to temporary file
-            # OpenAI TTS returns binary content directly
             audio_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3').name
             print(f"Saving audio to: {audio_path}")
             
-            # The response content is bytes that can be written directly
-            # Try different ways to access the content
-            audio_bytes = None
-            if hasattr(audio_response, 'content'):
-                audio_bytes = audio_response.content
-            elif hasattr(audio_response, 'read'):
-                audio_bytes = audio_response.read()
-            else:
-                # Try to get bytes directly
-                audio_bytes = bytes(audio_response)
+            if not audio_content:
+                raise Exception("TTS returned empty audio content")
             
-            if not audio_bytes:
-                raise Exception("OpenAI TTS returned empty audio content")
-            
-            print(f"Received {len(audio_bytes)} bytes of audio data")
+            print(f"Received {len(audio_content)} bytes of audio data")
             
             with open(audio_path, 'wb') as audio_file:
-                audio_file.write(audio_bytes)
+                audio_file.write(audio_content)
             
             # Verify the file was created and has content
             if not os.path.exists(audio_path):
@@ -1176,9 +1171,10 @@ def check_article_impact():
                 'message': 'Article and stocks are required'
             }), 400
         
-        # Use OpenAI to check if article impacts holdings
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
+        # Use OpenRouter to check if article impacts holdings
+        try:
+            client = OpenRouterClient()
+        except ValueError:
             # Fallback: simple keyword matching
             text = f"{article.get('title', '')} {article.get('summary', '')}".upper()
             impacts = any(symbol.upper() in text for symbol in stocks)
@@ -1186,8 +1182,6 @@ def check_article_impact():
                 'status': 'success',
                 'impacts_holdings': impacts
             }), 200
-        
-        client = OpenAI(api_key=api_key)
         
         prompt = f"""Determine if this financial news article might impact the user's stock holdings.
 
@@ -1210,8 +1204,8 @@ Respond with ONLY a JSON object:
     "reasoning": "brief explanation"
 }}"""
         
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+        response = client.chat_completions_create(
+            model=None,  # Uses default free model
             messages=[
                 {"role": "system", "content": "You are a financial analyst. Always return valid JSON only."},
                 {"role": "user", "content": prompt}
@@ -1273,39 +1267,96 @@ def generate_knowledge_graph():
             from bs4 import BeautifulSoup
             
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             }
-            response = requests.get(article_url, headers=headers, timeout=10)
+            response = requests.get(article_url, headers=headers, timeout=15, allow_redirects=True)
             response.raise_for_status()
+            
+            # Check content type
+            content_type = response.headers.get('Content-Type', '').lower()
+            if 'html' not in content_type:
+                raise ValueError(f"URL does not appear to be HTML content (Content-Type: {content_type})")
             
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Extract title
-            title = soup.find('title')
-            title_text = title.get_text().strip() if title else 'Article'
+            # Extract title - try multiple methods
+            title_text = 'Article'
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.get_text().strip()
+            else:
+                # Try meta tags
+                og_title = soup.find('meta', property='og:title')
+                if og_title:
+                    title_text = og_title.get('content', '').strip()
+                else:
+                    # Try h1
+                    h1 = soup.find('h1')
+                    if h1:
+                        title_text = h1.get_text().strip()
             
-            # Extract main content
+            if not title_text or len(title_text) < 3:
+                title_text = article_url.split('/')[-1] or 'Article'
+            
+            # Extract main content - try to find article content
             article_text = ''
-            for tag in soup.find_all(['p', 'article', 'div']):
-                text = tag.get_text().strip()
-                if len(text) > 50:  # Only include substantial paragraphs
-                    article_text += text + ' '
             
-            # Limit article text length
-            article_text = article_text[:5000]
+            # Try to find article tag first
+            article_tag = soup.find('article')
+            if article_tag:
+                for tag in article_tag.find_all(['p', 'div', 'section']):
+                    text = tag.get_text().strip()
+                    if len(text) > 50:
+                        article_text += text + ' '
             
+            # If no article tag, try common content selectors
+            if not article_text or len(article_text) < 200:
+                # Try common article content classes
+                content_selectors = [
+                    soup.find('div', class_=lambda x: x and ('article' in x.lower() or 'content' in x.lower() or 'post' in x.lower())),
+                    soup.find('main'),
+                    soup.find('div', id=lambda x: x and ('article' in x.lower() or 'content' in x.lower()))
+                ]
+                
+                for selector in content_selectors:
+                    if selector:
+                        for tag in selector.find_all(['p', 'div']):
+                            text = tag.get_text().strip()
+                            if len(text) > 50:
+                                article_text += text + ' '
+                        if len(article_text) > 200:
+                            break
+            
+            # Fallback: get all paragraphs
+            if not article_text or len(article_text) < 200:
+                for tag in soup.find_all('p'):
+                    text = tag.get_text().strip()
+                    if len(text) > 50:
+                        article_text += text + ' '
+            
+            # Clean up article text
+            article_text = ' '.join(article_text.split())  # Normalize whitespace
+            article_text = article_text[:5000]  # Limit length
+            
+            if len(article_text) < 100:
+                raise ValueError("Could not extract sufficient content from article")
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching article URL: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Could not fetch article from URL: {str(e)}. Please check the URL and try again.'
+            }), 400
         except Exception as e:
             print(f"Error scraping article: {e}")
-            # Use URL and basic info if scraping fails
-            title_text = article_url
-            article_text = f"Article from {article_url}"
+            return jsonify({
+                'status': 'error',
+                'message': f'Error processing article content: {str(e)}. Please ensure the URL points to a valid article.'
+            }), 400
         
-        # Use OpenAI to analyze the article and generate knowledge graph data
+        # Use OpenRouter to analyze the article and generate knowledge graph data
         try:
-            from openai import OpenAI
-            import os
-            
-            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            client = OpenRouterClient()
             
             stocks_str = ', '.join(portfolio_stocks) if portfolio_stocks else 'None'
             
@@ -1381,24 +1432,51 @@ Return ONLY valid JSON in this exact format:
 
 CRITICAL: You MUST include an impact entry for EVERY stock in the portfolio: {', '.join(portfolio_stocks)}. Do not leave any stock out. If the connection is indirect, explain the indirect relationship clearly."""
             
-            response = client.chat.completions.create(
-                model="gpt-4",
+            print(f"Calling OpenRouter API with {len(portfolio_stocks)} stocks...")
+            print(f"Article title: {title_text[:100]}")
+            print(f"Article content length: {len(article_text)} characters")
+            
+            response = client.chat_completions_create(
+                model=None,  # Uses default free model (deepseek/deepseek-r1-0528:free)
                 messages=[
                     {"role": "system", "content": "You are a financial analyst. Always return valid JSON only, no markdown. You MUST analyze impacts for every stock in the user's portfolio, even if the connection is indirect."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
-                max_tokens=2000  # Increased to accommodate detailed impacts for each stock
+                max_tokens=3000  # Increased to accommodate detailed impacts for each stock
             )
+            
+            print("OpenRouter API call successful")
             
             result_text = response.choices[0].message.content.strip()
             # Remove markdown code blocks if present
             if result_text.startswith('```'):
-                result_text = result_text.split('```')[1]
-                if result_text.startswith('json'):
-                    result_text = result_text[4:]
+                # Find the first ``` and remove everything before it
+                parts = result_text.split('```')
+                if len(parts) > 1:
+                    result_text = parts[1]  # Get content after first ```
+                    # Remove language identifier if present (json, JSON, etc.)
+                    if result_text.startswith('json') or result_text.startswith('JSON'):
+                        result_text = result_text[4:].lstrip()
+                else:
+                    result_text = result_text.replace('```', '')
             
-            result = json.loads(result_text)
+            # Try to parse JSON, with better error handling
+            try:
+                result = json.loads(result_text)
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}")
+                print(f"Response text: {result_text[:500]}")
+                # Try to extract JSON from the text if it's embedded
+                import re
+                json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group(0))
+                    except:
+                        raise ValueError(f"Could not parse JSON from OpenRouter response: {str(e)}")
+                else:
+                    raise ValueError(f"Could not parse JSON from OpenRouter response: {str(e)}")
             
             return jsonify({
                 'status': 'success',
@@ -1409,18 +1487,24 @@ CRITICAL: You MUST include an impact entry for EVERY stock in the portfolio: {',
             }), 200
             
         except Exception as e:
-            print(f"Error with OpenAI analysis: {e}")
-            # Fallback: generate basic structure
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error with OpenRouter analysis: {e}")
+            print(f"Full traceback: {error_details}")
+            
+            # Don't return fallback - return actual error so user knows what went wrong
+            error_message = str(e)
+            if 'rate limit' in error_message.lower():
+                error_message = 'OpenRouter API rate limit exceeded. Please try again in a moment.'
+            elif 'authentication' in error_message.lower() or 'api key' in error_message.lower():
+                error_message = 'OpenRouter API authentication failed. Please check your OPENROUTER_API_KEY.'
+            elif 'timeout' in error_message.lower():
+                error_message = 'Request timed out. Please try again.'
+            
             return jsonify({
-                'status': 'success',
-                'article': {
-                    'title': title_text,
-                    'summary': article_text[:200] + '...' if len(article_text) > 200 else article_text
-                },
-                'events': ['Article analyzed', 'Content extracted'],
-                'impacts': [],
-                'reasoning': ['Article analysis completed']
-            }), 200
+                'status': 'error',
+                'message': f'Failed to analyze article: {error_message}'
+            }), 500
         
     except Exception as e:
         print(f"Error generating knowledge graph: {e}")

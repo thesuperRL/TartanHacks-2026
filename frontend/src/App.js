@@ -266,6 +266,34 @@ function App() {
     }
   }, [authLoading, isAuthenticated, logoAnimationComplete]);
 
+  // Animate sidebar and map when toggling back from knowledge graph
+  useEffect(() => {
+    if (isAuthenticated && !showKnowledgeGraph) {
+      // Use a small delay to ensure DOM is updated after conditional render
+      const timer = setTimeout(() => {
+        try {
+          requestAnimationFrame(() => {
+            const sidebar = document.querySelector('.sidebar');
+            const mapContainer = document.querySelector('.map-container');
+            
+            if (sidebar) {
+              sidebar.classList.remove('animate-out');
+              sidebar.classList.add('animate-in');
+            }
+            if (mapContainer) {
+              mapContainer.classList.remove('animate-out');
+              mapContainer.classList.add('animate-in');
+            }
+          });
+        } catch (err) {
+          console.error('Error animating sidebar/map:', err);
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showKnowledgeGraph, isAuthenticated]);
+
   // Login animations - using CSS classes for performance
   useEffect(() => {
     if (prevAuthenticatedRef.current === false && isAuthenticated === true) {
@@ -556,9 +584,9 @@ function App() {
               <ModeSelector selectedMode={mode} onModeChange={setMode} />
               <div className="nav-buttons">
                 <button 
-                  className="nav-button"
-                  onClick={() => setShowKnowledgeGraph(true)}
-                  title="Open Knowledge Graph"
+                  className={`nav-button ${showKnowledgeGraph ? 'active' : ''}`}
+                  onClick={() => setShowKnowledgeGraph(!showKnowledgeGraph)}
+                  title={showKnowledgeGraph ? "Close Knowledge Graph" : "Open Knowledge Graph"}
                 >
                   🧠 Knowledge Graph
                 </button>
@@ -579,29 +607,16 @@ function App() {
           )}
         </div>
 
-        <div className="app-content-inner">
+        <div className={`app-content-inner ${showKnowledgeGraph ? 'show-knowledge-graph' : ''}`}>
           {isAuthenticated && (
             showKnowledgeGraph ? (
-              <div style={{ 
-                width: '100%', 
-                height: '100%', 
-                position: 'relative',
-                overflow: 'auto',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <button
-                  className="nav-button"
-                  onClick={() => setShowKnowledgeGraph(false)}
-                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
-                >
-                  ← Back to Map
-                </button>
-                <KnowledgeGraph portfolio={portfolio} stocks={stocks} />
+              <div className="knowledge-graph-wrapper">
+                <KnowledgeGraph portfolio={portfolio || []} stocks={stocks || []} />
               </div>
             ) : (
               <>
                 <Sidebar
+                  key="sidebar"
                   popularArticles={[...popularArticles, ...demoArticles]}
                   onArticleClick={handleArticleClick}
                   selectedArticle={selectedArticle}
@@ -616,7 +631,7 @@ function App() {
                   portfolio={portfolio}
                   stocks={stocks}
                 />
-                <div className="map-container">
+                <div key="map-container" className="map-container">
                   <MapViewer 
                     articles={articles}
                     selectedArticle={selectedArticle}

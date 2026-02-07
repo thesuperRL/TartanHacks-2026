@@ -1,5 +1,5 @@
 import os
-from openai import OpenAI
+from openrouter_client import OpenRouterClient
 from geopy.geocoders import Nominatim, GoogleV3
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 from typing import List, Dict, Optional
@@ -9,11 +9,11 @@ import re
 
 class NewsProcessor:
     def __init__(self):
-        self.api_key = os.getenv('OPENAI_API_KEY')
-        if not self.api_key:
-            print("Warning: OPENAI_API_KEY not set. Location detection will be limited.")
-        else:
-            self.client = OpenAI(api_key=self.api_key)
+        try:
+            self.client = OpenRouterClient()
+        except ValueError:
+            print("Warning: OPENROUTER_API_KEY not set. Location detection will be limited.")
+            self.client = None
         
         # Initialize geocoders
         self.geocoder = Nominatim(user_agent="news_viewer_app_v2")
@@ -286,7 +286,7 @@ class NewsProcessor:
     
     def detect_location_with_ai(self, article: Dict) -> Dict:
         """Use AI to detect topic-related locations (e.g., wind farms for energy articles)"""
-        if not self.api_key:
+        if not self.client:
             # Fallback: try to extract location from title/summary
             return self._fallback_location_detection(article)
         
@@ -381,8 +381,8 @@ Respond with ONLY valid JSON:
 
 If truly no location can be determined, use "Unknown"."""
             
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+            response = self.client.chat_completions_create(
+                model=None,  # Uses default free model
                 messages=[
                     {"role": "system", "content": "You are a precision location detection expert. Extract the EXACT geographic location with maximum specificity. You MUST respond with ONLY valid JSON, no other text."},
                     {"role": "user", "content": prompt}
@@ -1919,7 +1919,7 @@ If truly no location can be determined, use "Unknown"."""
     
     def categorize_with_ai(self, article: Dict) -> str:
         """Use AI to categorize article as financial or political"""
-        if not self.api_key:
+        if not self.client:
             return article.get('category', 'political')
         
         try:
@@ -1930,8 +1930,8 @@ Summary: {article.get('summary', '')[:300]}
 
 Respond with ONLY one word: "financial" or "political"."""
             
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+            response = self.client.chat_completions_create(
+                model=None,  # Uses default free model
                 messages=[
                     {"role": "system", "content": "You are a news categorization assistant. Respond with only one word."},
                     {"role": "user", "content": prompt}
