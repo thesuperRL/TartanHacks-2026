@@ -11,6 +11,7 @@ import LogoAnimation from './components/LogoAnimation';
 import PredictionResults from './components/PredictionResults';
 import ModeSelector from './components/ModeSelector';
 import KnowledgeGraph from './components/KnowledgeGraph';
+import PortfolioPlanner from './components/PortfolioPlanner';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
@@ -163,6 +164,7 @@ function App() {
   const [predictionMinimized, setPredictionMinimized] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
+  const [showPortfolioPlanner, setShowPortfolioPlanner] = useState(false);
   const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
   const [predictions, setPredictions] = useState(null);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
@@ -217,16 +219,16 @@ function App() {
   useEffect(() => {
     if (!authLoading && logoAnimationComplete && !hasAnimatedStartup.current) {
       hasAnimatedStartup.current = true;
-      
+
       // Add animation classes - CSS handles the rest (GPU-accelerated)
       const header = document.querySelector('.app-header');
       const content = document.querySelector('.app-content');
-      
+
       // Start animations immediately for smooth transition
       if (header) {
         header.classList.add('animate-in');
       }
-      
+
       if (content) {
         // Remove hidden class first, then animate in
         content.classList.remove('hidden');
@@ -253,7 +255,7 @@ function App() {
 
             const sidebar = document.querySelector('.sidebar');
             const mapContainer = document.querySelector('.map-container');
-            
+
             requestAnimationFrame(() => {
               setTimeout(() => {
                 if (sidebar) sidebar.classList.add('animate-in');
@@ -266,34 +268,6 @@ function App() {
     }
   }, [authLoading, isAuthenticated, logoAnimationComplete]);
 
-  // Animate sidebar and map when toggling back from knowledge graph
-  useEffect(() => {
-    if (isAuthenticated && !showKnowledgeGraph) {
-      // Use a small delay to ensure DOM is updated after conditional render
-      const timer = setTimeout(() => {
-        try {
-          requestAnimationFrame(() => {
-            const sidebar = document.querySelector('.sidebar');
-            const mapContainer = document.querySelector('.map-container');
-            
-            if (sidebar) {
-              sidebar.classList.remove('animate-out');
-              sidebar.classList.add('animate-in');
-            }
-            if (mapContainer) {
-              mapContainer.classList.remove('animate-out');
-              mapContainer.classList.add('animate-in');
-            }
-          });
-        } catch (err) {
-          console.error('Error animating sidebar/map:', err);
-        }
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [showKnowledgeGraph, isAuthenticated]);
-
   // Login animations - using CSS classes for performance
   useEffect(() => {
     if (prevAuthenticatedRef.current === false && isAuthenticated === true) {
@@ -304,13 +278,13 @@ function App() {
           const header = document.querySelector('.app-header');
           const headerH1 = document.querySelector('.app-header h1');
           const content = document.querySelector('.app-content');
-          
+
           // Make app-content visible first
           if (content) {
             content.classList.remove('hidden');
             content.classList.add('animate-in');
           }
-          
+
           // Animate header
           if (header) {
             header.classList.add('animate-in');
@@ -338,7 +312,7 @@ function App() {
             setTimeout(() => {
               const sidebar = document.querySelector('.sidebar');
               const mapContainer = document.querySelector('.map-container');
-              
+
               if (sidebar) sidebar.classList.add('animate-in');
               if (mapContainer) {
                 requestAnimationFrame(() => {
@@ -347,7 +321,7 @@ function App() {
               }
             }, 50);
           });
-          
+
           // Remove blur with CSS transition
           if (content) {
             content.classList.remove('blurred');
@@ -365,15 +339,15 @@ function App() {
       const header = document.querySelector('.app-header h1');
       const buttons = document.querySelectorAll('.refresh-button, .user-info, .nav-button, .sidebar, .map-container');
       const content = document.querySelector('.app-content');
-      
+
       if (header) header.classList.add('animate-out');
-      
+
       buttons.forEach((btn, i) => {
         setTimeout(() => {
           btn.classList.add('animate-out');
         }, i * 30);
       });
-      
+
       // Add blur with CSS transition
       if (content) {
         setTimeout(() => {
@@ -509,16 +483,16 @@ function App() {
       // Clear existing articles first
       setArticles([]);
       setPopularArticles(getDefaultArticles(mode));
-      
+
       // Also try to fetch real news if backend is available
       try {
-        await fetch(`${API_BASE_URL}/news/refresh`, { 
+        await fetch(`${API_BASE_URL}/news/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: mode })
         });
         await fetchNews();
-        
+
         // Fetch popular news and replace existing articles
         try {
           const response = await fetch(`${API_BASE_URL}/news/popular?category=all&mode=${mode}`);
@@ -569,31 +543,38 @@ function App() {
       )}
       {!isAuthenticated && <AuthModal />}
       {isAuthenticated && (
-        <SettingsModal 
-          isOpen={showSettings} 
+        <SettingsModal
+          isOpen={showSettings}
           onClose={() => setShowSettings(false)}
           onStocksUpdate={handleStocksUpdate}
         />
       )}
-      
+
       <div className={`app-content ${!isAuthenticated ? 'blurred' : ''} ${!logoAnimationComplete ? 'hidden' : ''}`}>
         <div className="app-header">
-          <h1>Survey</h1>
+          <h1>🌍 Global News Explorer</h1>
           {isAuthenticated && (
             <>
               <ModeSelector selectedMode={mode} onModeChange={setMode} />
               <div className="nav-buttons">
-                <button 
-                  className={`nav-button ${showKnowledgeGraph ? 'active' : ''}`}
-                  onClick={() => setShowKnowledgeGraph(!showKnowledgeGraph)}
-                  title={showKnowledgeGraph ? "Close Knowledge Graph" : "Open Knowledge Graph"}
+                <button
+                  className="nav-button"
+                  onClick={() => setShowKnowledgeGraph(true)}
+                  title="Open Knowledge Graph"
                 >
                   🧠 Knowledge Graph
                 </button>
+                <button
+                  className="nav-button"
+                  onClick={() => setShowPortfolioPlanner(true)}
+                  title="Open Portfolio Planner"
+                >
+                  📋 Portfolio Planner
+                </button>
               </div>
               <div className="user-info">
-                <button 
-                  className="user-name-button" 
+                <button
+                  className="user-name-button"
                   onClick={() => setShowSettings(true)}
                   title="Open settings"
                 >
@@ -607,16 +588,47 @@ function App() {
           )}
         </div>
 
-        <div className={`app-content-inner ${showKnowledgeGraph ? 'show-knowledge-graph' : ''}`}>
+        <div className="app-content-inner">
           {isAuthenticated && (
             showKnowledgeGraph ? (
-              <div className="knowledge-graph-wrapper">
-                <KnowledgeGraph portfolio={portfolio || []} stocks={stocks || []} />
+              <div style={{
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <button
+                  className="nav-button"
+                  onClick={() => setShowKnowledgeGraph(false)}
+                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
+                >
+                  ← Back to Map
+                </button>
+                <KnowledgeGraph portfolio={portfolio} stocks={stocks} />
+              </div>
+            ) : showPortfolioPlanner ? (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <button
+                  className="nav-button"
+                  onClick={() => setShowPortfolioPlanner(false)}
+                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
+                >
+                  ← Back to Map
+                </button>
+                <PortfolioPlanner />
               </div>
             ) : (
               <>
                 <Sidebar
-                  key="sidebar"
                   popularArticles={[...popularArticles, ...demoArticles]}
                   onArticleClick={handleArticleClick}
                   selectedArticle={selectedArticle}
@@ -631,8 +643,8 @@ function App() {
                   portfolio={portfolio}
                   stocks={stocks}
                 />
-                <div key="map-container" className="map-container">
-                  <MapViewer 
+                <div className="map-container">
+                  <MapViewer
                     articles={articles}
                     selectedArticle={selectedArticle}
                     onArticleSelect={setSelectedArticle}
