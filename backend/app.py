@@ -105,7 +105,29 @@ def get_news():
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
     category = request.args.get('category', 'all')  # 'financial', 'political', or 'all'
+    mode = request.args.get('mode', 'economic')  # 'economic' or 'political'
     articles = processor.get_articles_by_category(category)
+    
+    # Transform titles based on mode if needed
+    # Only transform if the mode doesn't match the current title orientation
+    if mode == 'political':
+        for article in articles:
+            title = article.get('title', '')
+            # Check if title is already political-oriented
+            political_keywords = ['geopolitical', 'political', 'diplomatic', 'strategic', 'international relations', 'crisis', 'tensions']
+            if not any(keyword.lower() in title.lower() for keyword in political_keywords):
+                # Extract original title (remove finance prefixes if present)
+                original_title = title
+                finance_prefixes = ['Market Impact: ', 'Financial Analysis: ', 'Investment Outlook: ', 
+                                   'Market Trends: ', 'Economic Impact: ', 'Trading Implications: ', 
+                                   'Financial Markets: ']
+                for prefix in finance_prefixes:
+                    if original_title.startswith(prefix):
+                        original_title = original_title[len(prefix):]
+                        break
+                article['title'] = processor._make_title_political_oriented(original_title)
+    # For economic mode, titles are already finance-oriented by default
+    
     return jsonify(articles)
 
 @app.route('/api/news/popular', methods=['GET', 'OPTIONS'])
@@ -115,7 +137,29 @@ def get_popular_news():
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
     category = request.args.get('category', 'all')
+    mode = request.args.get('mode', 'economic')  # 'economic' or 'political'
     articles = processor.get_popular_articles(category, limit=20)
+    
+    # Transform titles based on mode if needed
+    # Only transform if the mode doesn't match the current title orientation
+    if mode == 'political':
+        for article in articles:
+            title = article.get('title', '')
+            # Check if title is already political-oriented
+            political_keywords = ['geopolitical', 'political', 'diplomatic', 'strategic', 'international relations', 'crisis', 'tensions']
+            if not any(keyword.lower() in title.lower() for keyword in political_keywords):
+                # Extract original title (remove finance prefixes if present)
+                original_title = title
+                finance_prefixes = ['Market Impact: ', 'Financial Analysis: ', 'Investment Outlook: ', 
+                                   'Market Trends: ', 'Economic Impact: ', 'Trading Implications: ', 
+                                   'Financial Markets: ']
+                for prefix in finance_prefixes:
+                    if original_title.startswith(prefix):
+                        original_title = original_title[len(prefix):]
+                        break
+                article['title'] = processor._make_title_political_oriented(original_title)
+    # For economic mode, titles are already finance-oriented by default
+    
     return jsonify(articles)
 
 @app.route('/api/news/refresh', methods=['POST', 'OPTIONS'])
@@ -125,8 +169,10 @@ def refresh_news():
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
     try:
+        data = request.get_json() or {}
+        mode = data.get('mode', 'economic')  # 'economic' or 'political'
         articles = scraper.scrape_all_sources()
-        processor.process_articles(articles)
+        processor.process_articles(articles, mode=mode)
         return jsonify({'status': 'success', 'message': 'News refreshed successfully'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -981,6 +1027,76 @@ def get_video_file(filename):
             'status': 'error',
             'message': str(e)
         }), 500
+
+@app.route('/api/places/search', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def search_places():
+    """Search for a place using Places API (New) and return coordinates"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        location_query = data.get('location', '')
+        
+        if not location_query:
+            return jsonify({'error': 'Location query is required'}), 400
+        
+        # Try multiple possible environment variable names
+        google_api_key = os.getenv('GOOGLE_MAPS_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        if not google_api_key:
+            return jsonify({
+                'error': 'Google Maps API key not configured',
+                'message': 'Please set GOOGLE_MAPS_API_KEY in your .env file. Get your API key from https://console.cloud.google.com/google/maps-apis/credentials'
+            }), 500
+        
+        # Use Places API (New) Text Search endpoint
+        # Reference: https://developers.google.com/maps/documentation/places/web-service/text-search
+        import requests
+        
+        url = 'https://places.googleapis.com/v1/places:searchText'
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': google_api_key,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.formattedAddress'
+        }
+        body = {
+            'textQuery': location_query,
+            'maxResultCount': 1
+        }
+        
+        response = requests.post(url, headers=headers, json=body, timeout=10)
+        
+        if response.status_code != 200:
+            error_data = response.json() if response.text else {}
+            error_message = error_data.get('error', {}).get('message', f'Places API error: {response.status_code}')
+            return jsonify({'error': error_message}), response.status_code
+        
+        data = response.json()
+        
+        if data.get('places') and len(data['places']) > 0:
+            place = data['places'][0]
+            place_location = place.get('location', {})
+            
+            if place_location.get('latitude') and place_location.get('longitude'):
+                return jsonify({
+                    'success': True,
+                    'location': {
+                        'lat': place_location['latitude'],
+                        'lng': place_location['longitude']
+                    },
+                    'name': place.get('displayName', {}).get('text', location_query),
+                    'address': place.get('formattedAddress', '')
+                }), 200
+            else:
+                return jsonify({'error': 'Invalid location data from Places API'}), 500
+        else:
+            return jsonify({'error': f'No places found for "{location_query}"'}), 404
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Places API request failed: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Error searching places: {str(e)}'}), 500
 
 @app.route('/api/articles/check-impact', methods=['POST', 'OPTIONS'])
 @cross_origin()

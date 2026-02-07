@@ -1,5 +1,40 @@
 // Generate demo articles for global locations and California counties
 
+// City to landmark mapping for specific landmarks
+const cityLandmarks = {
+  'Tokyo': { financial: 'Tokyo Stock Exchange, Tokyo, Japan', political: 'National Diet Building, Tokyo, Japan' },
+  'Beijing': { financial: 'Beijing Financial Street, Beijing, China', political: 'Great Hall of the People, Beijing, China' },
+  'Moscow': { financial: 'Moscow Exchange, Moscow, Russia', political: 'Kremlin, Moscow, Russia' },
+  'Paris': { financial: 'Euronext Paris, Paris, France', political: 'Élysée Palace, Paris, France' },
+  'Berlin': { financial: 'Deutsche Börse, Frankfurt, Germany', political: 'Reichstag Building, Berlin, Germany' },
+  'Rome': { financial: 'Borsa Italiana, Milan, Italy', political: 'Palazzo Chigi, Rome, Italy' },
+  'Madrid': { financial: 'Madrid Stock Exchange, Madrid, Spain', political: 'Spanish Parliament (Congreso de los Diputados), Madrid, Spain' },
+  'London': { financial: 'London Stock Exchange, London, UK', political: 'Houses of Parliament, London, UK' },
+  'New York': { financial: 'New York Stock Exchange, New York, NY, USA', political: 'United Nations Headquarters, New York, NY, USA' },
+  'Washington, DC': { financial: 'Federal Reserve Building, Washington, DC, USA', political: 'US Capitol Building, Washington, DC, USA' },
+  'San Francisco': { financial: 'Federal Reserve Bank of San Francisco, San Francisco, CA, USA', political: 'San Francisco City Hall, San Francisco, CA, USA' },
+  'Chicago': { financial: 'Chicago Board of Trade, Chicago, IL, USA', political: 'Chicago City Hall, Chicago, IL, USA' },
+  'Houston': { financial: 'Houston Financial District, Houston, TX, USA', political: 'Houston City Hall, Houston, TX, USA' },
+  'Atlanta': { financial: 'Federal Reserve Bank of Atlanta, Atlanta, GA, USA', political: 'Georgia State Capitol, Atlanta, GA, USA' },
+  'Sydney': { financial: 'Australian Securities Exchange, Sydney, Australia', political: 'Parliament House, Sydney, Australia' },
+  'Toronto': { financial: 'Toronto Stock Exchange, Toronto, Canada', political: 'Ontario Legislative Building, Toronto, Canada' },
+  'Mumbai': { financial: 'Bombay Stock Exchange, Mumbai, India', political: 'Mantralaya, Mumbai, India' },
+  'Dubai': { financial: 'Dubai Financial Market, Dubai, UAE', political: 'Dubai Municipality, Dubai, UAE' },
+  'Singapore': { financial: 'Singapore Exchange, Singapore', political: 'Parliament House, Singapore' },
+  'Hong Kong': { financial: 'Hong Kong Stock Exchange, Hong Kong', political: 'Central Government Complex, Hong Kong' },
+  'Seoul': { financial: 'Korea Exchange, Seoul, South Korea', political: 'National Assembly Building, Seoul, South Korea' },
+  'Mexico City': { financial: 'Mexican Stock Exchange, Mexico City, Mexico', political: 'National Palace, Mexico City, Mexico' },
+  'Buenos Aires': { financial: 'Buenos Aires Stock Exchange, Buenos Aires, Argentina', political: 'Casa Rosada, Buenos Aires, Argentina' },
+  'Johannesburg': { financial: 'Johannesburg Stock Exchange, Johannesburg, South Africa', political: 'Union Buildings, Pretoria, South Africa' },
+  'Bangkok': { financial: 'Stock Exchange of Thailand, Bangkok, Thailand', political: 'Grand Palace, Bangkok, Thailand' },
+  'Jakarta': { financial: 'Indonesia Stock Exchange, Jakarta, Indonesia', political: 'Merdeka Palace, Jakarta, Indonesia' },
+  'Istanbul': { financial: 'Borsa Istanbul, Istanbul, Turkey', political: 'Dolmabahçe Palace, Istanbul, Turkey' },
+  'Lagos': { financial: 'Nigerian Stock Exchange, Lagos, Nigeria', political: 'Aso Rock Presidential Villa, Abuja, Nigeria' },
+  'Boston': { financial: 'Federal Reserve Bank of Boston, Boston, MA, USA', political: 'Massachusetts State House, Boston, MA, USA' },
+  'Seattle': { financial: 'Seattle Financial District, Seattle, WA, USA', political: 'Seattle City Hall, Seattle, WA, USA' },
+  'Miami': { financial: 'Miami Financial District, Miami, FL, USA', political: 'Miami City Hall, Miami, FL, USA' },
+};
+
 const globalCities = [
   { name: 'Tokyo', country: 'Japan', lat: 35.6762, lng: 139.6503 },
   { name: 'Beijing', country: 'China', lat: 39.9042, lng: 116.4074 },
@@ -248,6 +283,39 @@ const financeTitles = [
   'Investment Trends: Green Bonds Gain Popularity',
 ];
 
+const politicalTitles = [
+  'Geopolitical Impact: International Summit Addresses Regional Tensions',
+  'Political Analysis: Election Results Reshape Government Priorities',
+  'Strategic Implications: Military Alliance Strengthens Defense Posture',
+  'Diplomatic Developments: Trade Negotiations Reach Critical Phase',
+  'International Relations: Border Disputes Escalate in Conflict Zone',
+  'Political Crisis: Government Faces No-Confidence Vote',
+  'Geopolitical Tensions: Sanctions Imposed on Key Trading Partner',
+  'Strategic Assessment: Regional Power Balance Shifts',
+  'Political Shift: New Administration Announces Foreign Policy Changes',
+  'Geopolitical Dynamics: Territorial Claims Intensify Maritime Disputes',
+  'Diplomatic News: Peace Talks Resume After Ceasefire Agreement',
+  'Political Trends: Voter Turnout Reaches Historic Levels',
+  'Strategic Analysis: Military Exercises Signal Regional Intentions',
+  'Geopolitical Update: International Court Rules on Territorial Dispute',
+  'Political Developments: Coalition Government Forms After Elections',
+  'Strategic Report: Defense Spending Increases Amid Regional Threats',
+  'Geopolitical Outlook: International Mediation Attempts to Resolve Conflict',
+  'Political News: Opposition Parties Unite Against Government Policy',
+  'Strategic Trends: Arms Control Negotiations Stall',
+  'Geopolitical Analysis: Economic Sanctions Impact Regional Stability',
+  'Political Update: Constitutional Amendments Proposed',
+  'Strategic Impact: Military Base Expansion Raises Regional Concerns',
+  'Geopolitical News: International Observers Monitor Election Process',
+  'Political Assessment: Government Approval Ratings Decline',
+  'Strategic Developments: Intelligence Sharing Agreement Signed',
+  'Geopolitical Trends: Refugee Crisis Tests International Cooperation',
+  'Political Analysis: Corruption Scandal Rocks Government',
+  'Strategic Report: Nuclear Non-Proliferation Talks Continue',
+  'Geopolitical Update: Regional Trade Bloc Faces Internal Divisions',
+  'Political Dynamics: War Crimes Tribunal Issues Landmark Ruling',
+];
+
 const financeSummaries = [
   'Market analysts predict significant price movements following this development.',
   'Trading volume has increased substantially as investors react to the news.',
@@ -261,6 +329,19 @@ const financeSummaries = [
   'Market sentiment has shifted following the latest financial reports.',
 ];
 
+const politicalSummaries = [
+  'International observers are monitoring the situation closely for diplomatic implications.',
+  'Regional tensions have escalated following this geopolitical development.',
+  'Government officials are coordinating responses with international partners.',
+  'Military analysts are assessing the strategic implications of these developments.',
+  'Diplomatic channels are being activated to address the growing crisis.',
+  'International organizations are calling for restraint and dialogue.',
+  'Regional alliances are being tested by these political shifts.',
+  'Security forces are on high alert following the announcement.',
+  'Geopolitical experts predict significant changes in regional power dynamics.',
+  'International relations have been strained by these political developments.',
+];
+
 const sources = ['Bloomberg', 'Reuters', 'Financial Times', 'CNBC', 'MarketWatch', 'Wall Street Journal', 'Forbes', 'Yahoo Finance'];
 
 // Generate random offset within a small radius (for clustering)
@@ -268,24 +349,45 @@ function randomOffset(maxOffset = 0.1) {
   return (Math.random() - 0.5) * maxOffset;
 }
 
-export function generateDemoArticles() {
+export function generateDemoArticles(mode = 'economic') {
   const articles = [];
   let articleId = 1;
+
+  // Select titles and summaries based on mode
+  const titles = mode === 'political' ? politicalTitles : financeTitles;
+  const summaries = mode === 'political' ? politicalSummaries : financeSummaries;
+  const category = mode === 'political' ? 'political' : 'financial';
+  const contextPhrase = mode === 'political' 
+    ? 'is being closely monitored by international observers and regional analysts'
+    : 'is being closely watched by global markets';
 
   // Generate global articles (1-2 per major city, visible at zoom 0-3)
   globalCities.forEach(city => {
     const numArticles = Math.floor(Math.random() * 2) + 1; // 1-2 articles per city
     for (let i = 0; i < numArticles; i++) {
-      const title = financeTitles[Math.floor(Math.random() * financeTitles.length)];
-      const summary = financeSummaries[Math.floor(Math.random() * financeSummaries.length)];
+      const title = titles[Math.floor(Math.random() * titles.length)];
+      const summary = summaries[Math.floor(Math.random() * summaries.length)];
       const source = sources[Math.floor(Math.random() * sources.length)];
+      
+      // Get specific landmark for this city and mode
+      let location = `${city.name}, ${city.country}`;
+      let locationReasoning = `This location in ${city.name}, ${city.country} is relevant to the article's topic.`;
+      
+      if (cityLandmarks[city.name]) {
+        const landmark = cityLandmarks[city.name][category] || cityLandmarks[city.name].financial || cityLandmarks[city.name].political;
+        if (landmark) {
+          location = landmark;
+          locationReasoning = `This landmark (${landmark.split(',')[0]}) in ${city.name} is a significant location related to ${category === 'political' ? 'political and geopolitical developments' : 'financial and economic activities'}.`;
+        }
+      }
       
       articles.push({
         id: `global-${articleId++}`,
         title: `${title} in ${city.name}`,
-        summary: `${summary} This development in ${city.name}, ${city.country} is being closely watched by global markets.`,
-        category: 'financial',
-        location: `${city.name}, ${city.country}`,
+        summary: `${summary} This development in ${city.name}, ${city.country} ${contextPhrase}.`,
+        category: category,
+        location: location,
+        location_reasoning: locationReasoning,
         source: source,
         url: `https://example.com/article-${articleId}`,
         coordinates: {
@@ -302,10 +404,17 @@ export function generateDemoArticles() {
 
   // Generate California county articles (3 per county, visible at zoom 4+)
   let californiaArticleIndex = 0;
+  const regionalContext = mode === 'political'
+    ? 'Local political developments in'
+    : 'Local markets in';
+  const regionalResponse = mode === 'political'
+    ? 'are responding to regional political and geopolitical developments'
+    : 'are responding to regional economic developments';
+
   californiaCounties.forEach(county => {
     for (let i = 0; i < 3; i++) {
-      const title = financeTitles[Math.floor(Math.random() * financeTitles.length)];
-      const summary = financeSummaries[Math.floor(Math.random() * financeSummaries.length)];
+      const title = titles[Math.floor(Math.random() * titles.length)];
+      const summary = summaries[Math.floor(Math.random() * summaries.length)];
       const source = sources[Math.floor(Math.random() * sources.length)];
       
       // Distribute articles across a much wider zoom range (4.0 to 8.0) for very gradual appearance
@@ -318,12 +427,35 @@ export function generateDemoArticles() {
       const appearanceRange = 0.3; // Each article takes 0.3 zoom levels to fully appear
       const maxZoom = minZoom + appearanceRange;
       
+      // For California counties, use specific landmarks or financial districts
+      let countyLocation = `${county.name} County, California`;
+      let countyReasoning = `This location in ${county.name} County, California is relevant to the article's topic.`;
+      
+      // For major California cities, use specific landmarks
+      if (county.name === 'San Francisco') {
+        countyLocation = mode === 'political' 
+          ? 'San Francisco City Hall, San Francisco, CA, USA'
+          : 'Federal Reserve Bank of San Francisco, San Francisco, CA, USA';
+        countyReasoning = `This landmark in San Francisco is a significant location for ${mode === 'political' ? 'political and government activities' : 'financial and economic activities'}.`;
+      } else if (county.name === 'Los Angeles') {
+        countyLocation = mode === 'political'
+          ? 'Los Angeles City Hall, Los Angeles, CA, USA'
+          : 'Los Angeles Financial District, Los Angeles, CA, USA';
+        countyReasoning = `This location in Los Angeles is relevant to ${mode === 'political' ? 'political developments' : 'financial markets'}.`;
+      } else if (county.name === 'San Diego') {
+        countyLocation = mode === 'political'
+          ? 'San Diego City Hall, San Diego, CA, USA'
+          : 'San Diego Financial District, San Diego, CA, USA';
+        countyReasoning = `This location in San Diego relates to ${mode === 'political' ? 'government and political activities' : 'economic and financial developments'}.`;
+      }
+      
       articles.push({
         id: `ca-${articleId++}`,
         title: `${title} in ${county.name} County`,
-        summary: `${summary} Local markets in ${county.name} County, California are responding to regional economic developments.`,
-        category: 'financial',
-        location: `${county.name} County, California`,
+        summary: `${summary} ${regionalContext} ${county.name} County, California ${regionalResponse}.`,
+        category: category,
+        location: countyLocation,
+        location_reasoning: countyReasoning,
         source: source,
         url: `https://example.com/article-${articleId}`,
         coordinates: {
