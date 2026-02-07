@@ -1,8 +1,9 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS, cross_origin
 from news_scraper import NewsScraper
 from news_processor import NewsProcessor
 from stock_prediction import StockPredictor
+from portfolio_predictor import PortfolioPredictor
 import os
 import asyncio
 import json
@@ -10,6 +11,10 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from openai import OpenAI
+import tempfile
+import subprocess
+from pathlib import Path
 
 load_dotenv()
 
@@ -27,6 +32,7 @@ CORS(app,
 scraper = NewsScraper()
 processor = NewsProcessor()
 stock_predictor = StockPredictor()
+portfolio_predictor = PortfolioPredictor()
 
 # DEPRECATED: Authentication and portfolio storage moved to Firebase
 # Keeping these for backward compatibility, but they're no longer used
@@ -367,6 +373,199 @@ def health_check():
         return jsonify({'status': 'ok'}), 200
     return jsonify({'status': 'healthy', 'cors': 'enabled'})
 
+@app.route('/api/stocks/prices', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def get_stock_prices():
+    """
+    Get real-time stock prices for multiple symbols.
+    
+    Expected JSON input:
+    {
+        "symbols": ["AAPL", "MSFT", "GOOGL"]
+    }
+    
+    Returns current prices and percentage changes for each symbol.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Request body must contain JSON data'
+            }), 400
+        
+        symbols = data.get('symbols', [])
+        
+        if not symbols or not isinstance(symbols, list):
+            return jsonify({
+                'status': 'error',
+                'message': 'symbols must be a non-empty list of stock symbols'
+            }), 400
+        
+        # Normalize symbols
+        symbols = [s.upper().strip() for s in symbols if s]
+        
+        if not symbols:
+            return jsonify({
+                'status': 'error',
+                'message': 'symbols list cannot be empty'
+            }), 400
+        
+        # Fetch current prices for all symbols
+        import yfinance as yf
+        from datetime import datetime, timedelta
+        
+        results = []
+        for symbol in symbols:
+            try:
+                ticker = yf.Ticker(symbol)
+                # Get current info and recent history
+                info = ticker.info
+                hist = ticker.history(period='5d')
+                
+                if hist.empty:
+                    results.append({
+                        'symbol': symbol,
+                        'price': None,
+                        'change': None,
+                        'name': info.get('longName', symbol),
+                        'error': 'No data available'
+                    })
+                    continue
+                
+                # Get current price (most recent close)
+                current_price = float(hist['Close'].iloc[-1])
+                
+                # Calculate percentage change from previous close
+                if len(hist) > 1:
+                    previous_price = float(hist['Close'].iloc[-2])
+                    change_percent = ((current_price - previous_price) / previous_price) * 100
+                else:
+                    # If only one day of data, try to get previous close from info
+                    previous_close = info.get('previousClose')
+                    if previous_close:
+                        change_percent = ((current_price - previous_close) / previous_close) * 100
+                    else:
+                        change_percent = 0.0
+                
+                # Get company name
+                company_name = info.get('longName') or info.get('shortName') or symbol
+                
+                results.append({
+                    'symbol': symbol,
+                    'price': round(current_price, 2),
+                    'change': round(change_percent, 2),
+                    'name': company_name
+                })
+            except Exception as e:
+                results.append({
+                    'symbol': symbol,
+                    'price': None,
+                    'change': None,
+                    'name': symbol,
+                    'error': str(e)
+                })
+        
+        return jsonify({
+            'status': 'success',
+            'stocks': results
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error fetching stock prices: {str(e)}'
+        }), 500
+
+@app.route('/api/portfolio/predictions', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def get_portfolio_predictions():
+    """
+    Scrape news and generate predictions for portfolio stocks.
+    
+    Expected JSON input:
+    {
+        "symbols": ["AAPL", "MSFT", "GOOGL"]
+    }
+    
+    Returns predictions based on scraped news for each stock.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Request body must contain JSON data'
+            }), 400
+        
+        symbols = data.get('symbols', [])
+        
+        if not symbols or not isinstance(symbols, list):
+            return jsonify({
+                'status': 'error',
+                'message': 'symbols must be a non-empty list of stock symbols'
+            }), 400
+        
+        # Normalize symbols
+        symbols = [s.upper().strip() for s in symbols if s]
+        
+        if not symbols:
+            return jsonify({
+                'status': 'error',
+                'message': 'symbols list cannot be empty'
+            }), 400
+        
+        # Limit to 10 stocks to avoid timeout
+        if len(symbols) > 10:
+            return jsonify({
+                'status': 'error',
+                'message': 'Maximum 10 stocks allowed per request'
+            }), 400
+        
+        # Run async prediction
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            predictions = loop.run_until_complete(
+                portfolio_predictor.predict_portfolio_stocks(symbols)
+            )
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error in portfolio predictions: {error_trace}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Error generating predictions: {str(e)}',
+                'details': str(e)
+            }), 500
+        finally:
+            loop.close()
+        
+        return jsonify(predictions), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Invalid input: {str(e)}'
+        }), 400
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in portfolio predictions endpoint: {error_trace}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Error generating predictions: {str(e)}',
+            'details': str(e)
+        }), 500
+
 @app.route('/api/predict/article-impact', methods=['POST', 'OPTIONS'])
 @cross_origin()
 def predict_article_impact():
@@ -484,10 +683,390 @@ def predict_article_impact():
             'message': f'Error processing prediction: {str(e)}'
         }), 500
 
+@app.route('/api/articles/search', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def search_articles():
+    """AI-powered article search"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        query = data.get('query', '')
+        articles = data.get('articles', [])
+        
+        if not query or not articles:
+            return jsonify({
+                'status': 'error',
+                'message': 'Query and articles are required'
+            }), 400
+        
+        # Use OpenAI for semantic search
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            # Fallback to text search
+            filtered = [a for a in articles if query.lower() in (a.get('title', '') + ' ' + a.get('summary', '')).lower()]
+            return jsonify({
+                'status': 'success',
+                'articles': filtered,
+                'explanation': None
+            }), 200
+        
+        client = OpenAI(api_key=api_key)
+        
+        # Create article summaries for AI
+        article_summaries = []
+        for i, article in enumerate(articles[:50]):  # Limit to 50 for performance
+            article_summaries.append(f"{i}: {article.get('title', '')} - {article.get('summary', '')[:200]}")
+        
+        prompt = f"""Search through these financial articles and find the most relevant ones for this query: "{query}"
+
+Articles:
+{chr(10).join(article_summaries)}
+
+Return a JSON object with:
+1. A list of article indices (0-based) that are most relevant
+2. A brief explanation of why these articles match the query
+
+Format:
+{{
+    "indices": [0, 3, 5],
+    "explanation": "These articles match because..."
+}}"""
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a financial news search assistant. Always return valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=300
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        indices = result.get('indices', [])
+        explanation = result.get('explanation', '')
+        
+        # Get articles by indices
+        matched_articles = [articles[i] for i in indices if 0 <= i < len(articles)]
+        
+        return jsonify({
+            'status': 'success',
+            'articles': matched_articles,
+            'explanation': explanation
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in article search: {e}")
+        # Fallback to text search
+        query_lower = query.lower()
+        filtered = [a for a in articles if query_lower in (a.get('title', '') + ' ' + a.get('summary', '')).lower()]
+        return jsonify({
+            'status': 'success',
+            'articles': filtered,
+            'explanation': None
+        }), 200
+
+@app.route('/api/video/daily-digest', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def generate_daily_digest_video():
+    """Generate a financial daily digest video"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        portfolio = data.get('portfolio', [])
+        stocks = data.get('stocks', [])
+        predictions = data.get('predictions')
+        
+        # Generate video script using AI
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return jsonify({
+                'status': 'error',
+                'message': 'OpenAI API key not configured'
+            }), 500
+        
+        client = OpenAI(api_key=api_key)
+        
+        # Build portfolio summary
+        portfolio_summary = []
+        for stock in stocks:
+            price = stock.get('price', 0)
+            change = stock.get('change', 0)
+            portfolio_summary.append(f"{stock.get('symbol', 'N/A')}: ${price:.2f} ({change:+.2f}%)")
+        
+        predictions_summary = ""
+        if predictions:
+            pred_items = []
+            for symbol, pred in predictions.items():
+                if isinstance(pred, dict):
+                    change = pred.get('predictedChange', 0)
+                    price = pred.get('predictedPrice', 0)
+                    pred_items.append(f"{symbol}: Predicted {change:+.2f}% to ${price:.2f}")
+            predictions_summary = "\n".join(pred_items)
+        
+        prompt = f"""Create a script for a 2-minute financial daily digest video based on this portfolio:
+
+Portfolio Holdings:
+{chr(10).join(portfolio_summary) if portfolio_summary else 'No holdings'}
+
+Predictions:
+{predictions_summary if predictions_summary else 'No predictions available'}
+
+Create an engaging, professional script that:
+1. Opens with a greeting and date
+2. Summarizes portfolio performance
+3. Highlights key predictions and insights
+4. Provides actionable recommendations
+5. Closes with a positive outlook
+
+Format as a clear script with natural speech patterns."""
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a financial news anchor creating a daily digest script."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=800
+        )
+        
+        script = response.choices[0].message.content
+        
+        # Generate audio using OpenAI TTS
+        try:
+            audio_response = client.audio.speech.create(
+                model="tts-1",
+                voice="alloy",  # Options: alloy, echo, fable, onyx, nova, shimmer
+                input=script[:4000]  # Limit to 4000 characters for TTS
+            )
+            
+            # Save audio to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as audio_file:
+                audio_file.write(audio_response.content)
+                audio_path = audio_file.name
+            
+            # Create a simple video with the audio
+            # We'll use a static image or gradient background
+            video_path = None
+            try:
+                # Check if ffmpeg is available
+                subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+                
+                # Create a simple video with audio (static image + audio)
+                video_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
+                
+                # Create a simple colored background video
+                # Using ffmpeg to create a video with the audio
+                cmd = [
+                    'ffmpeg',
+                    '-f', 'lavfi',
+                    '-i', 'color=c=0x1a1a2e:s=1280x720:d=60',  # Background color matching app theme
+                    '-i', audio_path,
+                    '-c:v', 'libx264',
+                    '-tune', 'stillimage',
+                    '-c:a', 'aac',
+                    '-shortest',
+                    '-pix_fmt', 'yuv420p',
+                    '-y',  # Overwrite output file
+                    video_path
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                
+                if result.returncode != 0:
+                    print(f"FFmpeg error: {result.stderr}")
+                    # Fallback: just return audio
+                    video_path = None
+            except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError) as e:
+                print(f"Video creation error: {e}")
+                # Fallback: just return audio
+                video_path = None
+            
+            # Store file paths temporarily (in production, upload to S3 or similar)
+            temp_files[os.path.basename(audio_path)] = audio_path
+            if video_path and os.path.exists(video_path):
+                temp_files[os.path.basename(video_path)] = video_path
+            
+            # Return audio file path or video if created
+            if video_path and os.path.exists(video_path):
+                return jsonify({
+                    'status': 'success',
+                    'script': script,
+                    'audio_url': f'/api/video/audio/{os.path.basename(audio_path)}',
+                    'video_url': f'/api/video/file/{os.path.basename(video_path)}',
+                    'message': 'Podcast video generated successfully!',
+                    'portfolio_summary': portfolio_summary,
+                    'predictions_summary': predictions_summary
+                }), 200
+            else:
+                # Return audio only
+                return jsonify({
+                    'status': 'success',
+                    'script': script,
+                    'audio_url': f'/api/video/audio/{os.path.basename(audio_path)}',
+                    'video_url': None,
+                    'message': 'Audio podcast generated successfully!',
+                    'portfolio_summary': portfolio_summary,
+                    'predictions_summary': predictions_summary
+                }), 200
+                
+        except Exception as e:
+            print(f"Error generating audio: {e}")
+            # Fallback: return script only
+            return jsonify({
+                'status': 'success',
+                'script': script,
+                'audio_url': None,
+                'video_url': None,
+                'message': 'Script generated. Audio generation failed.',
+                'portfolio_summary': portfolio_summary,
+                'predictions_summary': predictions_summary
+            }), 200
+        
+    except Exception as e:
+        print(f"Error generating daily digest: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Failed to generate video: {str(e)}'
+        }), 500
+
+# Store temporary files (in production, use proper file storage)
+temp_files = {}
+
+@app.route('/api/video/audio/<filename>', methods=['GET'])
+@cross_origin()
+def get_audio_file(filename):
+    """Serve generated audio file"""
+    try:
+        if filename in temp_files and os.path.exists(temp_files[filename]):
+            return send_file(
+                temp_files[filename],
+                mimetype='audio/mpeg',
+                as_attachment=False,
+                download_name='daily-digest-podcast.mp3'
+            )
+        return jsonify({
+            'status': 'error',
+            'message': 'Audio file not found'
+        }), 404
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/video/file/<filename>', methods=['GET'])
+@cross_origin()
+def get_video_file(filename):
+    """Serve generated video file"""
+    try:
+        if filename in temp_files and os.path.exists(temp_files[filename]):
+            return send_file(
+                temp_files[filename],
+                mimetype='video/mp4',
+                as_attachment=False,
+                download_name='daily-digest-podcast.mp4'
+            )
+        return jsonify({
+            'status': 'error',
+            'message': 'Video file not found'
+        }), 404
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/articles/check-impact', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def check_article_impact():
+    """AI-powered check if an article impacts user's holdings"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    try:
+        data = request.get_json()
+        article = data.get('article', {})
+        stocks = data.get('stocks', [])
+        
+        if not stocks or not article:
+            return jsonify({
+                'status': 'error',
+                'message': 'Article and stocks are required'
+            }), 400
+        
+        # Use OpenAI to check if article impacts holdings
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            # Fallback: simple keyword matching
+            text = f"{article.get('title', '')} {article.get('summary', '')}".upper()
+            impacts = any(symbol.upper() in text for symbol in stocks)
+            return jsonify({
+                'status': 'success',
+                'impacts_holdings': impacts
+            }), 200
+        
+        client = OpenAI(api_key=api_key)
+        
+        prompt = f"""Determine if this financial news article might impact the user's stock holdings.
+
+Article Title: {article.get('title', '')}
+Article Summary: {article.get('summary', '')}
+Location: {article.get('location', '')}
+Category: {article.get('category', '')}
+
+User's Stock Holdings: {', '.join(stocks)}
+
+Consider:
+1. Direct mentions of stock symbols or company names
+2. Sector/industry impacts
+3. Geographic relevance (e.g., if article is about a region where companies operate)
+4. Market-wide impacts that could affect the holdings
+
+Respond with ONLY a JSON object:
+{{
+    "impacts_holdings": true/false,
+    "reasoning": "brief explanation"
+}}"""
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a financial analyst. Always return valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=150
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        
+        return jsonify({
+            'status': 'success',
+            'impacts_holdings': result.get('impacts_holdings', False),
+            'reasoning': result.get('reasoning', '')
+        }), 200
+        
+    except Exception as e:
+        print(f"Error checking article impact: {e}")
+        # Fallback: simple keyword matching
+        article_data = data.get('article', {})
+        text = f"{article_data.get('title', '')} {article_data.get('summary', '')}".upper()
+        impacts = any(symbol.upper() in text for symbol in stocks)
+        return jsonify({
+            'status': 'success',
+            'impacts_holdings': impacts
+        }), 200
+
 
 if __name__ == '__main__':
-    # Use port 5001 to avoid conflict with macOS AirPlay Receiver on port 5000
-    port = int(os.getenv('PORT', 5001))
+    # Use port 5004 to avoid conflict with macOS AirPlay Receiver on port 5000
+    port = int(os.getenv('PORT', 5004))
     print(f"Starting backend server on http://localhost:{port}")
     print("CORS enabled for all origins")
     app.run(debug=True, port=port, host='0.0.0.0')

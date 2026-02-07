@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
+import { db } from './config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { generateDemoArticles } from './utils/generateDemoArticles';
 import MapViewer from './components/MapViewer';
 import Sidebar from './components/Sidebar';
 import AuthModal from './components/AuthModal';
@@ -8,7 +11,7 @@ import LogoAnimation from './components/LogoAnimation';
 import PredictionResults from './components/PredictionResults';
 import './App.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
 
 // Debug: Log the API URL being used
 console.log('API Base URL:', API_BASE_URL);
@@ -17,7 +20,69 @@ console.log('Mapbox Access Token:', process.env.REACT_APP_MAPBOX_ACCESS_TOKEN ? 
 function App() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
   const [articles, setArticles] = useState([]);
-  const [popularArticles, setPopularArticles] = useState([]);
+  const [demoArticles] = useState(() => generateDemoArticles());
+  const [popularArticles, setPopularArticles] = useState([
+    {
+      id: 'article-1',
+      title: 'Market Impact: Federal Reserve Signals Potential Rate Cuts in Q2',
+      summary: 'The Federal Reserve hints at monetary policy shifts that could impact bond yields and stock valuations across multiple sectors.',
+      category: 'financial',
+      location: 'Washington, DC',
+      source: 'Bloomberg',
+      url: 'https://www.bloomberg.com',
+      coordinates: { lat: 38.9072, lng: -77.0369 },
+      popularity_score: 0.9,
+      blurred: false
+    },
+    {
+      id: 'article-2',
+      title: 'Investment Outlook: Tech Stocks Rally on Strong Earnings Reports',
+      summary: 'Major technology companies exceed analyst expectations, driving significant gains in NASDAQ and attracting institutional investors.',
+      category: 'financial',
+      location: 'San Francisco',
+      source: 'Reuters',
+      url: 'https://www.reuters.com',
+      coordinates: { lat: 37.7749, lng: -122.4194 },
+      popularity_score: 0.85,
+      blurred: false
+    },
+    {
+      id: 'article-3',
+      title: 'Financial Analysis: Oil Prices Surge Amid Supply Chain Disruptions',
+      summary: 'Global energy markets experience volatility as geopolitical tensions affect crude oil supply chains and refinery operations.',
+      category: 'financial',
+      location: 'New York',
+      source: 'Financial Times',
+      url: 'https://www.ft.com',
+      coordinates: { lat: 40.7128, lng: -74.0060 },
+      popularity_score: 0.8,
+      blurred: false
+    },
+    {
+      id: 'article-4',
+      title: 'Trading Implications: Cryptocurrency Markets See Increased Institutional Adoption',
+      summary: 'Major banks and hedge funds announce cryptocurrency trading desks, signaling mainstream acceptance of digital assets.',
+      category: 'financial',
+      location: 'London',
+      source: 'CNBC',
+      url: 'https://www.cnbc.com',
+      coordinates: { lat: 51.5074, lng: -0.1278 },
+      popularity_score: 0.75,
+      blurred: false
+    },
+    {
+      id: 'article-5',
+      title: 'Economic Impact: Inflation Data Shows Cooling Trend in Consumer Prices',
+      summary: 'Latest CPI figures suggest the Federal Reserve\'s monetary policy is achieving its inflation targets, affecting bond markets.',
+      category: 'financial',
+      location: 'Washington, DC',
+      source: 'MarketWatch',
+      url: 'https://www.marketwatch.com',
+      coordinates: { lat: 38.9072, lng: -77.0369 },
+      popularity_score: 0.7,
+      blurred: false
+    }
+  ]);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
@@ -28,10 +93,37 @@ function App() {
   const [predictions, setPredictions] = useState(null);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
   const [userStocks, setUserStocks] = useState(['TSLA']);
+  const [portfolio, setPortfolio] = useState([]);
+  const [stocks, setStocks] = useState([]);
   const prevAuthenticatedRef = useRef(null);
   const hasAnimatedStartup = useRef(false);
 
+  // Load portfolio data
   useEffect(() => {
+    if (!isAuthenticated || !user?.uid) return;
+
+    const portfolioRef = doc(db, 'portfolios', user.uid);
+    const unsubscribe = onSnapshot(
+      portfolioRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          const portfolioStocks = data.stocks || [];
+          setPortfolio(portfolioStocks);
+          setStocks(portfolioStocks);
+        }
+      },
+      (error) => {
+        console.error('Error loading portfolio:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isAuthenticated, user?.uid]);
+
+  useEffect(() => {
+    // Always initialize with demo articles for the map
+    // The MapViewer will use demo articles if articles array is empty
     if (isAuthenticated) {
       fetchNews();
       fetchPopularNews();
@@ -192,30 +284,26 @@ function App() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setPopularArticles(Array.isArray(data) ? data : []);
+      // Merge API articles with default articles, avoiding duplicates
+      const apiArticles = Array.isArray(data) ? data : [];
+      setPopularArticles(prev => {
+        const existingIds = new Set(prev.map(a => a.id));
+        const newArticles = apiArticles.filter(a => !existingIds.has(a.id));
+        return [...prev, ...newArticles];
+      });
       setLoading(false);
     } catch (error) {
       console.error('Error fetching popular news:', error);
       if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
         console.error('Backend server may not be running. Please start it with: ./start-backend.sh');
       }
-      setPopularArticles([]);
+      // Don't clear articles on error - keep the default ones
       setLoading(false);
     }
   };
 
   const generateFakeArticle = () => {
-    const mathArticles = [
-      { title: "Cauchy Sequences in Topological Spaces: A Breakthrough in Non-Euclidean Convergence", field: "ANALYSIS", source: "Math Quarterly Digest" },
-      { title: "Lebesgue Measure Theory Disrupts Classical Mathematical Markets", field: "MATH THEORY", source: "Journal of Pure Math" },
-      { title: "Uniform Continuity and Lipschitz Functions: New Applications in Quantitative Trading", field: "ANALYSIS", source: "Math Quarterly Digest" },
-      { title: "Monotone Convergence Theorem Proves Predictive for Stock Volatility", field: "MATH THEORY", source: "Computational Math Review" },
-      { title: "Riemann Integrals Meet Financial Derivatives: Surprising Connections", field: "ANALYSIS", source: "Applied Mathematics Today" },
-      { title: "Borel σ-Algebra Enables Revolutionary Risk Assessment Methodology", field: "MATH THEORY", source: "Journal of Pure Math" },
-      { title: "Boundedness and Compactness Principles Shape New Portfolio Theory", field: "ANALYSIS", source: "Math Quarterly Digest" },
-      { title: "Infimum and Supremum Concepts Redefine Price Floor Analysis", field: "MATH THEORY", source: "Computational Math Review" }
-    ];
-
+    // Only use finance-oriented articles
     const financeArticles = [
       { title: "Apple Inc. Reports Revolutionary AI Chip Architecture", field: "TECH", source: "Bloomberg", stocks: ["AAPL"], summary: "Apple's new custom silicon shows unprecedented performance gains. Analysts predict market expansion." },
       { title: "Google Cloud Services Secure Major Enterprise Contracts", field: "TECH", source: "Reuters", stocks: ["GOOGL"], summary: "Google announces landmark partnerships with Fortune 500 companies. Cloud division expected to drive revenue growth." },
@@ -228,27 +316,20 @@ function App() {
     ];
 
     const locations = ["New York", "San Francisco", "Seattle", "Mountain View", "Cupertino", "London", "Tokyo"];
-    const mathSummaries = [
-      "Researchers discover that Lebesgue measurable spaces can predict market behavior with surprising accuracy.",
-      "A new theorem about uniform continuity has revolutionized how we think about price stability.",
-      "Using Cauchy sequences and convergence theory, mathematicians have developed a novel portfolio approach.",
-      "The application of Borel σ-algebra to financial risk assessment has yielded unexpected results.",
-      "Lipschitz continuous functions prove to be better predictors of market trends than previously thought.",
+    const financeSummaries = [
+      "Market analysts predict significant price movements following this development.",
+      "Trading volume has increased substantially as investors react to the news.",
+      "Financial institutions are adjusting their portfolios based on this information.",
+      "Investment firms are revising their price targets following this announcement.",
+      "Stock markets are showing increased volatility in response to this development.",
       "Monotone convergence principles have been successfully applied to derivative pricing."
     ];
 
-    const useFinance = Math.random() < 0.6;
-    let articleData;
-
-    if (useFinance) {
-      articleData = financeArticles[Math.floor(Math.random() * financeArticles.length)];
-    } else {
-      const mathArticle = mathArticles[Math.floor(Math.random() * mathArticles.length)];
-      articleData = { ...mathArticle, stocks: [] };
-    }
+    // Always use finance articles
+    const articleData = financeArticles[Math.floor(Math.random() * financeArticles.length)];
 
     const location = locations[Math.floor(Math.random() * locations.length)];
-    const summary = articleData.summary || mathSummaries[Math.floor(Math.random() * mathSummaries.length)];
+    const summary = articleData.summary || financeSummaries[Math.floor(Math.random() * financeSummaries.length)];
 
     return {
       id: `fake-${Date.now()}-${Math.random()}`,
@@ -366,9 +447,6 @@ function App() {
           <h1>🌍 Global News Explorer</h1>
           {isAuthenticated && (
             <>
-              <button className="refresh-button" onClick={handleRefreshNews} disabled={loading}>
-                {loading ? 'Refreshing' : '🔄 Refresh News'}
-              </button>
               <div className="user-info">
                 <button 
                   className="user-name-button" 
@@ -389,7 +467,7 @@ function App() {
           {isAuthenticated && (
             <>
               <Sidebar
-                popularArticles={popularArticles}
+                popularArticles={[...popularArticles, ...demoArticles]}
                 onArticleClick={handleArticleClick}
                 selectedArticle={selectedArticle}
                 portfolioMinimized={portfolioMinimized}
@@ -400,12 +478,16 @@ function App() {
                 predictionsLoading={predictionsLoading}
                 predictionMinimized={predictionMinimized}
                 onPredictionMinimize={setPredictionMinimized}
+                portfolio={portfolio}
+                stocks={stocks}
               />
               <div className="map-container">
                 <MapViewer 
                   articles={articles}
                   selectedArticle={selectedArticle}
                   onArticleSelect={setSelectedArticle}
+                  portfolio={portfolio}
+                  stocks={stocks}
                 />
               </div>
             </>

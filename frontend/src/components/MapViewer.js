@@ -1,14 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { loadMapbox } from '../utils/loadMapbox';
+import PhotosphereViewer from './PhotosphereViewer';
+import MindMapModal from './MindMapModal';
+import PodcastPlayer from './PodcastPlayer';
+import { generateDemoArticles } from '../utils/generateDemoArticles';
+import { checkArticleImpact } from '../utils/checkArticleImpact';
 import './MapViewer.css';
 
-const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
+const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [] }) => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [mapbox, setMapbox] = useState(null);
   const [loadingError, setLoadingError] = useState(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const markersRef = useRef([]);
-  const popupRef = useRef(null);
+  const popupsRef = useRef([]);
+  const [currentZoom, setCurrentZoom] = useState(2);
+  const [demoArticles] = useState(() => generateDemoArticles());
+
+  // Modal states
+  const [photosphereOpen, setPhotosphereOpen] = useState(false);
+  const [photosphereCoords, setPhotosphereCoords] = useState({ lat: null, lng: null });
+  const [photosphereTitle, setPhotosphereTitle] = useState('');
+  const [photosphereLocation, setPhotosphereLocation] = useState('');
+  const [photosphereStoryContext, setPhotosphereStoryContext] = useState('');
+  const [mindMapOpen, setMindMapOpen] = useState(false);
+  const [mindMapTitle, setMindMapTitle] = useState('');
+  const [mindMapLocation, setMindMapLocation] = useState('');
+  const [podcastOpen, setPodcastOpen] = useState(false);
+  const [podcastTitle, setPodcastTitle] = useState('');
+  const [podcastLocation, setPodcastLocation] = useState('');
 
   // Load Mapbox GL JS
   useEffect(() => {
@@ -22,410 +43,398 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       .catch((error) => {
         console.error('Error loading Mapbox:', error);
         setLoadingError(error.message);
-        if (mapContainerRef.current) {
-          mapContainerRef.current.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #2a2a2a; color: #fff; flex-direction: column; padding: 20px; text-align: center;">
-              <h2>⚠️ Mapbox Access Token Required</h2>
-              <p>${error.message}</p>
-              <p style="font-size: 12px; color: #aaa; margin-top: 10px;">
-                Create a .env file in the frontend directory and add:<br/>
-                REACT_APP_MAPBOX_ACCESS_TOKEN=your_access_token_here
-              </p>
-              <p style="font-size: 11px; color: #888; margin-top: 10px;">
-                Current Access Token: ${process.env.REACT_APP_MAPBOX_ACCESS_TOKEN ? 'Set (but may be invalid)' : 'Not set'}
-              </p>
-              <p style="font-size: 11px; color: #888; margin-top: 10px;">
-                Get your free access token at: <a href="https://account.mapbox.com/access-tokens/" target="_blank" style="color: #4a9eff;">https://account.mapbox.com/access-tokens/</a>
-              </p>
-            </div>
-          `;
-        }
       });
   }, []);
 
   // Initialize map once Mapbox is loaded
   useEffect(() => {
-    if (!mapbox || !mapContainerRef.current || mapRef.current) {
-      if (!mapbox) console.log('Waiting for Mapbox to load...');
-      if (!mapContainerRef.current) console.log('Waiting for map container...');
-      if (mapRef.current) console.log('Map already initialized');
-      return;
-    }
+    if (!mapbox || !mapContainerRef.current || mapRef.current) return;
 
     console.log('Initializing Mapbox map...');
-    
-    // Ensure map container has dimensions
-    const container = mapContainerRef.current;
-    const parent = container.parentElement;
-    
-    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
-      console.warn('Map container has no dimensions');
-      if (parent) {
-        const parentWidth = parent.offsetWidth || parent.clientWidth || window.innerWidth;
-        const parentHeight = parent.offsetHeight || parent.clientHeight || window.innerHeight;
-        container.style.width = `${parentWidth}px`;
-        container.style.height = `${parentHeight}px`;
-        console.log('Set container dimensions to:', parentWidth, 'x', parentHeight);
-      } else {
-        container.style.width = '100%';
-        container.style.height = '100%';
-        container.style.minHeight = '400px';
-      }
-    }
 
     try {
-      // Ensure we're using the correct Mapbox reference
       const mapboxgl = window.mapboxgl || mapbox;
-      
+
       if (!mapboxgl || !mapboxgl.Map) {
-        throw new Error('Mapbox GL JS not properly loaded. Map constructor not available.');
+        throw new Error('Mapbox GL JS not properly loaded.');
       }
-      
-      // Initialize map with base dark style, then customize colors
+
       const mapInstance = new mapboxgl.Map({
         container: mapContainerRef.current,
         style: 'mapbox://styles/mapbox/dark-v11',
-        center: [0, 20], // [lng, lat]
+        center: [0, 20],
         zoom: 2,
         attributionControl: true
       });
 
-      console.log('Map initialized successfully');
-      
+      // Add navigation controls
+      mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      mapInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+      mapInstance.addControl(new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true
+      }), 'top-right');
+
       mapRef.current = mapInstance;
 
-      // Handle map load - customize colors to match app theme
+      // Track zoom level
+      mapInstance.on('zoom', () => {
+        setCurrentZoom(mapInstance.getZoom());
+      });
+
       mapInstance.on('load', () => {
-        console.log('Map loaded, applying custom theme colors...');
-        
-        // Apply custom theme colors
+        console.log('Map loaded, applying custom theme...');
+        setMapLoaded(true);
+        setCurrentZoom(mapInstance.getZoom());
+
+        // Apply dark theme colors
         try {
-          // Debug: Check the 'land' layer specifically
-          const landLayer = mapInstance.getLayer('land');
-          if (landLayer) {
-            console.log('Land layer found:', {
-              id: landLayer.id,
-              type: landLayer.type,
-              paint: landLayer.paint,
-              layout: landLayer.layout
-            });
-          } else {
-            console.warn('Land layer not found!');
-          }
-          
-          // Background color
           if (mapInstance.getLayer('background')) {
             mapInstance.setPaintProperty('background', 'background-color', '#0f0c29');
           }
-          
-          // Water layers - based on actual layer names
-          const waterLayers = ['water', 'waterway'];
-          waterLayers.forEach(layerId => {
+
+          ['water', 'waterway'].forEach(layerId => {
             if (mapInstance.getLayer(layerId)) {
               const layer = mapInstance.getLayer(layerId);
-              try {
-                if (layer.type === 'fill') {
-                  mapInstance.setPaintProperty(layerId, 'fill-color', '#0a0e27');
-                } else if (layer.type === 'line') {
-                  mapInstance.setPaintProperty(layerId, 'line-color', '#0a0e27');
-                }
-                console.log(`Applied water color to layer: ${layerId}`);
-              } catch (e) {
-                console.warn(`Could not set color for water layer ${layerId}:`, e);
+              if (layer.type === 'fill') {
+                mapInstance.setPaintProperty(layerId, 'fill-color', '#0a0e27');
               }
             }
           });
-          
-          // Land layer - this is the main land fill layer
+
           if (mapInstance.getLayer('land')) {
-            try {
-              const landLayer = mapInstance.getLayer('land');
-              console.log('Attempting to color land layer, type:', landLayer.type);
-              
-              // Try fill-color first (most common)
-              try {
-                mapInstance.setPaintProperty('land', 'fill-color', '#302b63');
-                console.log('Set land fill-color');
-              } catch (e) {
-                console.warn('Could not set fill-color:', e.message);
-              }
-              
-              // Try fill-opacity
-              try {
-                mapInstance.setPaintProperty('land', 'fill-opacity', 0.85);
-                console.log('Set land fill-opacity');
-              } catch (e) {
-                console.warn('Could not set fill-opacity:', e.message);
-              }
-              
-              // If it's a background type, try background-color
-              if (landLayer.type === 'background') {
-                try {
-                  mapInstance.setPaintProperty('land', 'background-color', '#302b63');
-                  console.log('Set land background-color');
-                } catch (e) {
-                  console.warn('Could not set background-color:', e.message);
-                }
-              }
-            } catch (e) {
-              console.error('Error coloring land layer:', e);
-            }
+            mapInstance.setPaintProperty('land', 'fill-color', '#302b63');
           }
-          
-          // Land colors - other land-related layers
-          const landLayers = ['landuse', 'national-park', 'land-structure-polygon'];
-          landLayers.forEach(layerId => {
+
+          ['admin-0-boundary', 'admin-1-boundary'].forEach(layerId => {
             if (mapInstance.getLayer(layerId)) {
-              const layer = mapInstance.getLayer(layerId);
-              try {
-                if (layer.type === 'fill') {
-                  mapInstance.setPaintProperty(layerId, 'fill-color', '#302b63');
-                  mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.85);
-                  console.log(`Applied land color to layer: ${layerId}`);
-                } else if (layer.type === 'line') {
-                  mapInstance.setPaintProperty(layerId, 'line-color', '#302b63');
-                  mapInstance.setPaintProperty(layerId, 'line-opacity', 0.85);
-                  console.log(`Applied land color to line layer: ${layerId}`);
-                }
-              } catch (e) {
-                console.warn(`Could not set color for land layer ${layerId}:`, e);
-              }
+              mapInstance.setPaintProperty(layerId, 'line-color', '#4a9eff');
+              mapInstance.setPaintProperty(layerId, 'line-opacity', 0.4);
             }
           });
-          
-          // National parks - slightly different color
-          if (mapInstance.getLayer('national-park')) {
-            try {
-              const parkLayer = mapInstance.getLayer('national-park');
-              if (parkLayer.type === 'fill') {
-                mapInstance.setPaintProperty('national-park', 'fill-color', '#24243e');
-                mapInstance.setPaintProperty('national-park', 'fill-opacity', 0.8);
-                console.log('Applied park color');
-              }
-            } catch (e) {
-              console.warn('Could not set park color:', e);
-            }
-          }
-          
-          // Buildings
-          const buildingLayers = ['building', 'building-extrusion'];
-          buildingLayers.forEach(layerId => {
-            if (mapInstance.getLayer(layerId)) {
-              mapInstance.setPaintProperty(layerId, 'fill-color', '#8b5cf6');
-              mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.3);
-            }
-          });
-          
-          // Boundaries - use blue and purple accents
-          const boundaryLayers = ['admin-0-boundary', 'admin-1-boundary', 'admin-0-boundary-bg'];
-          boundaryLayers.forEach(layerId => {
-            if (mapInstance.getLayer(layerId)) {
-              const isCountry = layerId.includes('admin-0');
-              mapInstance.setPaintProperty(layerId, 'line-color', isCountry ? '#4a9eff' : '#8b5cf6');
-              mapInstance.setPaintProperty(layerId, 'line-opacity', isCountry ? 0.4 : 0.25);
-            }
-          });
-          
-          // Roads - highways in blue
-          const roadLayers = ['road-street', 'road-primary', 'road-secondary', 'road-highway'];
-          roadLayers.forEach(layerId => {
-            if (mapInstance.getLayer(layerId)) {
-              if (layerId.includes('highway')) {
-                mapInstance.setPaintProperty(layerId, 'line-color', '#4a9eff');
-                mapInstance.setPaintProperty(layerId, 'line-opacity', 0.5);
-              } else {
-                mapInstance.setPaintProperty(layerId, 'line-color', '#1a1a2e');
-                mapInstance.setPaintProperty(layerId, 'line-opacity', 0.3);
-              }
-            }
-          });
-          
-          console.log('Custom theme colors applied');
-        } catch (styleError) {
-          console.warn('Error applying custom colors:', styleError);
-          // Continue even if some layers don't exist
+        } catch (e) {
+          console.warn('Error applying theme:', e);
         }
       });
 
-      // Handle resize
-      const resizeHandler = () => {
-        if (mapInstance) {
-          mapInstance.resize();
-        }
-      };
-      window.addEventListener('resize', resizeHandler);
+      window.addEventListener('resize', () => mapInstance.resize());
 
-      // Cleanup
       return () => {
-        window.removeEventListener('resize', resizeHandler);
-        if (mapInstance) {
-          mapInstance.remove();
-        }
+        if (mapInstance) mapInstance.remove();
         mapRef.current = null;
       };
     } catch (error) {
       console.error('Error initializing map:', error);
-      if (mapContainerRef.current) {
-        mapContainerRef.current.innerHTML = `
-          <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #2a2a2a; color: #fff; flex-direction: column; padding: 20px; text-align: center;">
-            <h2>⚠️ Map Initialization Error</h2>
-            <p>${error.message}</p>
-            <p style="font-size: 12px; color: #aaa; margin-top: 10px;">
-              Please check your Mapbox access token and ensure it's valid.
-            </p>
-          </div>
-        `;
-      }
+      setLoadingError(error.message);
     }
   }, [mapbox]);
 
-  // Update markers when articles change
+  // Update markers when articles change or zoom changes
   useEffect(() => {
-    if (!mapRef.current || !mapbox || !articles.length) {
-      // Clear existing markers
-      markersRef.current.forEach(marker => marker.remove());
-      markersRef.current = [];
-      return;
-    }
+    if (!mapRef.current || !mapbox || !mapLoaded) return;
 
     const map = mapRef.current;
+    const mapboxgl = window.mapboxgl || mapbox;
 
     // Clear existing markers
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
+    popupsRef.current.forEach(popup => popup.remove());
+    popupsRef.current = [];
 
-    // Create markers for each article
-    articles.forEach(article => {
-      if (!article.coordinates || !article.coordinates.lat || !article.coordinates.lng) {
-        return;
+    // Filter articles with gradual zoom-based visibility
+    // Use demo articles if no articles provided, otherwise use provided articles
+    const allArticles = articles.length > 0 ? articles : demoArticles;
+    
+    // Filter articles with gradual appearance based on zoom level
+    const filteredArticles = allArticles.filter(article => {
+      const minZoom = article.minZoom !== undefined ? article.minZoom : 0;
+      const maxZoom = article.maxZoom !== undefined ? article.maxZoom : Infinity;
+      
+      if (currentZoom < minZoom) {
+        return false; // Not zoomed in enough
       }
+      
+      // For gradual appearance within the zoom range
+      if (maxZoom !== Infinity && currentZoom < maxZoom) {
+        // Calculate how far through the appearance range we are (0 to 1)
+        const zoomProgress = (currentZoom - minZoom) / (maxZoom - minZoom);
+        
+        // Use a smooth ease-in-out curve for gradual appearance
+        // This creates a smooth transition from 0% to 100% visibility
+        const visibility = zoomProgress * zoomProgress * (3 - 2 * zoomProgress); // Smoothstep function
+        
+        // Use article ID to create a deterministic but distributed appearance order
+        // Extract numeric part of ID for consistent hashing
+        const idNum = parseInt(article.id.replace(/\D/g, '')) || article.id.charCodeAt(0) || 0;
+        const articleOrder = (idNum % 1000) / 1000; // Normalize to 0-1
+        
+        // Article appears when visibility progress exceeds its order threshold
+        // This ensures articles appear in a distributed manner across the zoom range
+        return visibility >= articleOrder;
+      }
+      
+      return true; // Fully visible (past maxZoom)
+    });
 
-      const position = [article.coordinates.lng, article.coordinates.lat]; // [lng, lat] for Mapbox
+    // Only show articles with coordinates
+    const articlesWithCoords = filteredArticles.filter(a => a.coordinates?.lat && a.coordinates?.lng);
+    
+    // If zoomed out (zoom < 2.5), limit to a sample of global articles for performance
+    let markersToCreate = articlesWithCoords;
+    if (currentZoom < 2.5) {
+      // Show only a sample of global articles when zoomed out
+      markersToCreate = articlesWithCoords
+        .filter(a => (a.minZoom === 0 || a.minZoom === undefined) && (a.maxZoom === undefined || a.maxZoom > 2.5))
+        .slice(0, Math.max(10, Math.floor(20 * currentZoom))); // Gradually increase from 10 to 50 as zoom increases
+    }
 
-      // Determine marker color based on category
-      const markerColor = article.category === 'financial' ? '#4a9eff' : '#ff6b6b';
+    markersToCreate.forEach(article => {
+      const { lat, lng } = article.coordinates;
+      const coordinates = [lng, lat];
 
-      // Create a custom marker element
+      // Check if article impacts user holdings (synchronous check)
+      const impactResult = checkArticleImpact(article, stocks, portfolio);
+      const impactsHoldings = impactResult.impacts;
+      const impactReason = impactResult.reason;
+      
+      // Determine marker color: red if impacts holdings, otherwise category-based
+      let markerGradient;
+      if (impactsHoldings) {
+        markerGradient = 'linear-gradient(135deg,#FF3366,#FF0000)'; // Red for impactful
+      } else {
+        markerGradient = article.category === 'financial' 
+          ? 'linear-gradient(135deg,#00D4FF,#0099FF)' 
+          : 'linear-gradient(135deg,#FF6B9D,#FF3366)';
+      }
+      
+      // Store impact reason in article for popup display
+      article.impactReason = impactReason;
+
+      // Create marker element
       const el = document.createElement('div');
-      el.className = 'mapbox-marker';
-      el.style.width = '16px';
-      el.style.height = '16px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = markerColor;
-      el.style.border = '2px solid #ffffff';
-      el.style.cursor = 'pointer';
-      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-      
-      // Add animation for selected article
-      if (selectedArticle?.id === article.id) {
-        el.style.animation = 'bounce 1s infinite';
-        el.style.width = '20px';
-        el.style.height = '20px';
-      }
+      el.style.cssText = 'width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;';
 
-      // Get Mapbox reference
-      const mapboxgl = window.mapboxgl || mapbox;
-      
-      // Create marker
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(position)
+      const innerEl = document.createElement('div');
+      innerEl.style.cssText = `
+        width:24px;height:24px;border-radius:50%;border:4px solid white;
+        box-shadow:0 4px 12px rgba(0,0,0,0.4);
+        background:${markerGradient};
+        transition:transform 0.2s,box-shadow 0.2s;
+      `;
+      el.appendChild(innerEl);
+
+      el.addEventListener('mouseenter', () => {
+        innerEl.style.transform = 'scale(1.3)';
+        innerEl.style.boxShadow = '0 6px 20px rgba(0,0,0,0.5)';
+      });
+      el.addEventListener('mouseleave', () => {
+        innerEl.style.transform = 'scale(1)';
+        innerEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+      });
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(coordinates)
         .addTo(map);
 
-      // Create popup content
+      // Create popup content with bright colors and buttons
       const popupContent = document.createElement('div');
-      popupContent.className = 'marker-info';
+      popupContent.className = 'marker-popup';
+      const buttonGradient = article.category === 'financial'
+        ? 'linear-gradient(135deg, #00D4FF 0%, #0099FF 100%)'
+        : 'linear-gradient(135deg, #FF6B9D 0%, #FF3366 100%)';
+
+      // Add impact reason if article impacts holdings
+      const impactReasonHTML = impactReason 
+        ? `<div style="margin-top: 10px; padding: 10px; background: rgba(255, 51, 102, 0.15); border-left: 3px solid rgba(255, 51, 102, 0.6); border-radius: 6px;">
+             <strong style="color: rgba(255, 255, 255, 0.95); display: block; margin-bottom: 4px;">⚠️ Why this matters:</strong>
+             <p style="margin: 0; color: rgba(255, 255, 255, 0.85); font-size: 12px; line-height: 1.5;">${impactReason}</p>
+           </div>`
+        : '';
+
       popupContent.innerHTML = `
-        <h3>${article.title}</h3>
-        <p>${article.location}</p>
-        <p class="category">${article.category}</p>
-        <a href="${article.url}" target="_blank">Read more</a>
+          <div class="marker-info">
+            <h3>${article.title}</h3>
+          <p style="margin: 4px 0; color: rgba(255,255,255,0.7);">${article.location}</p>
+          <span class="category-badge ${article.category}">${article.category === 'financial' ? '💰 Financial' : '🏛️ Political'}</span>
+          ${impactReasonHTML}
+          <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; width: 100%;">
+            <button id="images-btn-${article.id}" style="
+              display: inline-block;
+              padding: 8px 16px;
+              background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 600;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              transition: all 0.2s;
+              cursor: pointer;
+            ">👁️ First-Person Perspective</button>
+            <button id="mindmap-btn-${article.id}" style="
+              display: inline-block;
+              padding: 8px 16px;
+              background: linear-gradient(135deg, #9B59B6 0%, #8E44AD 100%);
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 600;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              transition: all 0.2s;
+              cursor: pointer;
+            ">🧠 View Mind Map</button>
+            <button id="podcast-btn-${article.id}" style="
+              display: inline-block;
+              padding: 8px 16px;
+              background: linear-gradient(135deg, #52C41A 0%, #389E0D 100%);
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 600;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+              transition: all 0.2s;
+              cursor: pointer;
+            ">🎧 Listen to Podcast</button>
+          </div>
+        </div>
       `;
 
       // Create popup
-      const popup = new mapboxgl.Popup({ offset: 25, closeOnClick: true })
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: true,
+        closeOnClick: false,
+        className: 'article-popup'
+      })
         .setDOMContent(popupContent);
 
-      // Add click listener
-      marker.setPopup(popup);
-      
-      marker.getElement().addEventListener('click', () => {
+      // Add mousedown handler to prevent map drag
+      el.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      });
+
+      // Capture article data for button handlers
+      const articleLat = lat;
+      const articleLng = lng;
+      const articleTitle = article.title;
+      const articleLocation = article.location || '';
+
+      // Function to attach button handlers
+      const attachButtonHandlers = () => {
+        const imagesBtn = document.getElementById(`images-btn-${article.id}`);
+        if (imagesBtn && !imagesBtn.dataset.handlersAttached) {
+          imagesBtn.dataset.handlersAttached = 'true';
+          imagesBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPhotosphereCoords({ lat: articleLat, lng: articleLng });
+            setPhotosphereTitle(articleTitle);
+            setPhotosphereLocation(articleLocation);
+            setPhotosphereStoryContext(article.story_context || '');
+            setPhotosphereOpen(true);
+          });
+        }
+
+        // Add Mind Map button handler
+        const mindMapBtn = document.getElementById(`mindmap-btn-${article.id}`);
+        if (mindMapBtn && !mindMapBtn.dataset.handlersAttached) {
+          mindMapBtn.dataset.handlersAttached = 'true';
+          mindMapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setMindMapTitle(articleTitle);
+            setMindMapLocation(articleLocation);
+            setMindMapOpen(true);
+          });
+        }
+
+        // Add Podcast button handler
+        const podcastBtn = document.getElementById(`podcast-btn-${article.id}`);
+        if (podcastBtn && !podcastBtn.dataset.handlersAttached) {
+          podcastBtn.dataset.handlersAttached = 'true';
+          podcastBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPodcastTitle(articleTitle);
+            setPodcastLocation(articleLocation);
+            setPodcastOpen(true);
+          });
+        }
+      };
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
         onArticleSelect(article);
+
+        // Close any existing popups first (except this one)
+        popupsRef.current.forEach(p => {
+          if (p && p !== popup) {
+            p.remove();
+          }
+        });
+
+        // Fly to the location
         map.flyTo({
-          center: position,
+          center: coordinates,
           zoom: 10,
           duration: 1000
         });
+
+        // Show popup after a short delay to let flyTo start
+        setTimeout(() => {
+          console.log('Adding popup for:', article.title);
+          marker.setPopup(popup);
+          popup.addTo(map);
+          console.log('Popup added, isOpen:', popup.isOpen());
+
+          // Attach button handlers after popup is shown
+          setTimeout(attachButtonHandlers, 200);
+        }, 300);
       });
 
       markersRef.current.push(marker);
+      popupsRef.current.push(popup);
     });
 
-    // Fit map to show all markers if there are any
-    if (markersRef.current.length > 0) {
-      const mapboxgl = window.mapboxgl || mapbox;
-      const bounds = new mapboxgl.LngLatBounds();
-      markersRef.current.forEach(marker => {
-        bounds.extend(marker.getLngLat());
-      });
-      
-      // Only fit bounds if there's more than one marker or if no article is selected
-      if (markersRef.current.length > 1 || !selectedArticle) {
-        map.fitBounds(bounds, {
-          padding: 50,
-          maxZoom: 10
-        });
-      }
-    }
-
-  }, [mapbox, articles, selectedArticle, onArticleSelect]);
+  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, demoArticles]);
 
   return (
     <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>
-      {!mapbox && !loadingError && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          background: '#2a2a2a',
-          color: '#fff',
-          flexDirection: 'column',
-          position: 'absolute',
-          width: '100%',
-          zIndex: 10
-        }}>
+      {!mapLoaded && !loadingError && (
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',background:'#1a1a2e',color:'#fff',position:'absolute',width:'100%',zIndex:10 }}>
           <p>Loading map...</p>
         </div>
       )}
       {loadingError && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          background: '#2a2a2a',
-          color: '#fff',
-          flexDirection: 'column',
-          position: 'absolute',
-          width: '100%',
-          zIndex: 10
-        }}>
-          <p>Error: {loadingError}</p>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',background:'#1a1a2e',color:'#fff',flexDirection:'column',position:'absolute',width:'100%',zIndex:10,padding:'20px',textAlign:'center' }}>
+          <h2>⚠️ Map Error</h2>
+          <p>{loadingError}</p>
         </div>
       )}
-      <div 
-        ref={mapContainerRef} 
-        className="mapbox-map-container" 
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          minHeight: '400px',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          zIndex: 2,
-          display: mapbox ? 'block' : 'none'
-        }} 
+      <div ref={mapContainerRef} className="mapbox-map-container" style={{ width:'100%',height:'100%',minHeight:'400px',position:'absolute',top:0,left:0,zIndex:1 }} />
+
+      <PhotosphereViewer
+        isOpen={photosphereOpen}
+        onClose={() => setPhotosphereOpen(false)}
+        lat={photosphereCoords.lat}
+        lng={photosphereCoords.lng}
+        articleTitle={photosphereTitle}
+        location={photosphereLocation}
+        storyContext={photosphereStoryContext}
+      />
+      <MindMapModal
+        isOpen={mindMapOpen}
+        onClose={() => setMindMapOpen(false)}
+        articleTitle={mindMapTitle}
+        location={mindMapLocation}
+      />
+      <PodcastPlayer
+        isOpen={podcastOpen}
+        onClose={() => setPodcastOpen(false)}
+        articleTitle={podcastTitle}
+        location={podcastLocation}
       />
     </div>
   );

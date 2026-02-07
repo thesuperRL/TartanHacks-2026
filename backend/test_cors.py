@@ -6,7 +6,7 @@ Run this after starting the backend server
 import requests
 
 def test_cors():
-    base_url = "http://localhost:5001"
+    base_url = "http://localhost:5004"
     
     print("Testing CORS configuration...")
     print(f"Backend URL: {base_url}\n")

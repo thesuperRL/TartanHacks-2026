@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import PopularArticlesList from './PopularArticlesList';
+import ArticlesList from './ArticlesList';
+import ImportantArticlesList from './ImportantArticlesList';
 import PortfolioOverlay from './PortfolioOverlay';
 import PredictionResults from './PredictionResults';
+import DailyDigestVideo from './DailyDigestVideo';
 import './Sidebar.css';
 
 const Sidebar = ({ 
@@ -15,10 +17,13 @@ const Sidebar = ({
   predictions,
   predictionsLoading,
   predictionMinimized,
-  onPredictionMinimize
+  onPredictionMinimize,
+  portfolio,
+  stocks
 }) => {
   const [headerHeight, setHeaderHeight] = useState(80);
   const [availableHeight, setAvailableHeight] = useState(window.innerHeight - 80);
+  const [importantArticlesMinimized, setImportantArticlesMinimized] = useState(false);
 
   useEffect(() => {
     // Calculate header height dynamically
@@ -40,15 +45,49 @@ const Sidebar = ({
 
   return (
     <div className="sidebar" style={{ top: `${headerHeight}px`, height: `${availableHeight}px` }}>
-      {/* Popular Articles Section */}
+      {/* Important Articles Section */}
+      <div className={`sidebar-section ${importantArticlesMinimized ? 'minimized' : ''}`}>
+        <div 
+          className="sidebar-section-header"
+          onClick={() => setImportantArticlesMinimized(!importantArticlesMinimized)}
+        >
+          <div className="section-title">
+            <span className="section-icon">⚠️</span>
+            <span>Important Articles</span>
+          </div>
+          <button 
+            className="section-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              setImportantArticlesMinimized(!importantArticlesMinimized);
+            }}
+            title={importantArticlesMinimized ? 'Expand' : 'Minimize'}
+          >
+            {importantArticlesMinimized ? '□' : '−'}
+          </button>
+        </div>
+        {!importantArticlesMinimized && (
+          <div className="sidebar-section-content">
+            <ImportantArticlesList 
+              articles={popularArticles}
+              stocks={stocks}
+              portfolio={portfolio}
+              onArticleClick={onArticleClick}
+              selectedArticle={selectedArticle}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Articles Section */}
       <div className={`sidebar-section ${articlesMinimized ? 'minimized' : ''}`}>
         <div 
           className="sidebar-section-header"
           onClick={() => onArticlesMinimize(!articlesMinimized)}
         >
           <div className="section-title">
-            <span className="section-icon">🔥</span>
-            <span>Popular Articles</span>
+            <span className="section-icon">📰</span>
+            <span>Articles</span>
           </div>
           <button 
             className="section-toggle"
@@ -63,13 +102,30 @@ const Sidebar = ({
         </div>
         {!articlesMinimized && (
           <div className="sidebar-section-content">
-            <PopularArticlesList 
+            <ArticlesList 
               articles={popularArticles}
               onArticleClick={onArticleClick}
               selectedArticle={selectedArticle}
             />
           </div>
         )}
+      </div>
+
+      {/* Daily Digest Video Section */}
+      <div className={`sidebar-section ${false ? 'minimized' : ''}`}>
+        <div className="sidebar-section-header">
+          <div className="section-title">
+            <span className="section-icon">📹</span>
+            <span>Daily Digest</span>
+          </div>
+        </div>
+        <div className="sidebar-section-content">
+          <DailyDigestVideo 
+            portfolio={portfolio}
+            stocks={stocks}
+            predictions={predictions}
+          />
+        </div>
       </div>
 
       {/* Portfolio Section */}

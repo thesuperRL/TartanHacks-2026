@@ -54,7 +54,7 @@ cp .env.example .env
 python app.py
 ```
 
-The backend will run on `http://localhost:5001` (using 5001 to avoid macOS AirPlay Receiver conflict on port 5000)
+The backend will run on `http://localhost:5004` (using 5004 to avoid macOS AirPlay Receiver conflict on port 5000)
 
 ### Frontend Setup
 
@@ -72,7 +72,7 @@ npm install
 ```bash
 # Create .env file in frontend directory
 cat > .env << EOF
-REACT_APP_API_URL=http://localhost:5001/api
+REACT_APP_API_URL=http://localhost:5004/api
 REACT_APP_MAPBOX_ACCESS_TOKEN=your_mapbox_access_token_here
 EOF
 # Edit .env and add your Mapbox access token

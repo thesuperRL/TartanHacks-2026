@@ -173,10 +173,14 @@ Respond with ONLY one word: "financial" or "political"."""
             # Categorize
             category = self.categorize_with_ai(article)
             
+            # Transform title to be finance-oriented
+            original_title = article.get('title', '')
+            finance_title = self._make_title_finance_oriented(original_title)
+            
             # Create processed article
             processed_article = {
                 'id': f"article_{i}_{hash(article.get('url', ''))}",
-                'title': article.get('title', ''),
+                'title': finance_title,
                 'url': article.get('url', ''),
                 'summary': article.get('summary', ''),
                 'category': category,
@@ -185,7 +189,7 @@ Respond with ONLY one word: "financial" or "political"."""
                 'location': location_data['location_name'],
                 'coordinates': location_data['coordinates'],
                 'popularity_score': self._calculate_popularity_score(article),
-                'blurred': True  # Initially blurred
+                'blurred': False  # Show articles in popular section
             }
             
             processed.append(processed_article)
@@ -194,6 +198,44 @@ Respond with ONLY one word: "financial" or "political"."""
         self.processed_articles = processed
         self.save_articles()
         return processed
+    
+    def _make_title_finance_oriented(self, title: str) -> str:
+        """Transform any title to be finance-oriented"""
+        if not title:
+            return "Market Analysis: Financial Trends and Investment Opportunities"
+        
+        title_lower = title.lower()
+        
+        # Check if already finance-related
+        finance_keywords = ['stock', 'market', 'financial', 'trading', 'investment', 'revenue', 'earnings', 
+                           'profit', 'economy', 'dollar', 'currency', 'bank', 'fund', 'portfolio', 
+                           'dividend', 'ipo', 'merger', 'acquisition', 'analyst', 'forecast', 'price',
+                           'share', 'equity', 'bond', 'yield', 'inflation', 'gdp', 'fed', 'interest rate']
+        
+        if any(keyword in title_lower for keyword in finance_keywords):
+            # Already finance-oriented, return as is
+            return title
+        
+        # Transform to finance-oriented
+        # Add finance context to the title
+        finance_prefixes = [
+            "Market Impact: ",
+            "Financial Analysis: ",
+            "Investment Outlook: ",
+            "Market Trends: ",
+            "Economic Impact: ",
+            "Trading Implications: ",
+            "Financial Markets: "
+        ]
+        
+        import random
+        prefix = random.choice(finance_prefixes)
+        
+        # If title is very long, truncate and add finance context
+        if len(title) > 60:
+            title = title[:57] + "..."
+        
+        return prefix + title
     
     def _calculate_popularity_score(self, article: Dict) -> float:
         """Calculate a popularity score for an article"""
