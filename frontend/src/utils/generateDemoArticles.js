@@ -389,7 +389,7 @@ export function generateDemoArticles(mode = 'economic') {
         location: location,
         location_reasoning: locationReasoning,
         source: source,
-        url: `https://example.com/article-${articleId}`,
+        url: null, // Demo articles don't have real URLs
         coordinates: {
           lat: city.lat + randomOffset(0.05),
           lng: city.lng + randomOffset(0.05)
@@ -457,7 +457,7 @@ export function generateDemoArticles(mode = 'economic') {
         location: countyLocation,
         location_reasoning: countyReasoning,
         source: source,
-        url: `https://example.com/article-${articleId}`,
+        url: null, // Demo articles don't have real URLs
         coordinates: {
           lat: county.lat + randomOffset(0.2), // Spread articles around the county
           lng: county.lng + randomOffset(0.2)

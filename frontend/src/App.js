@@ -11,7 +11,6 @@ import LogoAnimation from './components/LogoAnimation';
 import PredictionResults from './components/PredictionResults';
 import ModeSelector from './components/ModeSelector';
 import KnowledgeGraph from './components/KnowledgeGraph';
-import PortfolioPlanner from './components/PortfolioPlanner';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
@@ -164,7 +163,7 @@ function App() {
   const [predictionMinimized, setPredictionMinimized] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
-  const [showPortfolioPlanner, setShowPortfolioPlanner] = useState(false);
+  const [knowledgeGraphArticleUrl, setKnowledgeGraphArticleUrl] = useState(null);
   const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
   const [predictions, setPredictions] = useState(null);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
@@ -433,7 +432,7 @@ function App() {
       category: articleData.field,
       location: location,
       source: articleData.source,
-      url: "https://example.com/article",
+      url: null, // Demo article - no real URL available
       stocks: articleData.stocks || [],
       content: summary,
       blurred: false
@@ -557,19 +556,12 @@ function App() {
             <>
               <ModeSelector selectedMode={mode} onModeChange={setMode} />
               <div className="nav-buttons">
-                <button
-                  className="nav-button"
-                  onClick={() => setShowKnowledgeGraph(true)}
-                  title="Open Knowledge Graph"
+                <button 
+                  className={`nav-button ${showKnowledgeGraph ? 'active' : ''}`}
+                  onClick={() => setShowKnowledgeGraph(!showKnowledgeGraph)}
+                  title={showKnowledgeGraph ? "Close Knowledge Graph" : "Open Knowledge Graph"}
                 >
                   🧠 Knowledge Graph
-                </button>
-                <button
-                  className="nav-button"
-                  onClick={() => setShowPortfolioPlanner(true)}
-                  title="Open Portfolio Planner"
-                >
-                  📋 Portfolio Planner
                 </button>
               </div>
               <div className="user-info">
@@ -591,40 +583,8 @@ function App() {
         <div className="app-content-inner">
           {isAuthenticated && (
             showKnowledgeGraph ? (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                overflow: 'auto',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <button
-                  className="nav-button"
-                  onClick={() => setShowKnowledgeGraph(false)}
-                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
-                >
-                  ← Back to Map
-                </button>
-                <KnowledgeGraph portfolio={portfolio} stocks={stocks} />
-              </div>
-            ) : showPortfolioPlanner ? (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                overflow: 'auto',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <button
-                  className="nav-button"
-                  onClick={() => setShowPortfolioPlanner(false)}
-                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
-                >
-                  ← Back to Map
-                </button>
-                <PortfolioPlanner />
+              <div className="knowledge-graph-wrapper">
+                <KnowledgeGraph portfolio={portfolio || []} stocks={stocks || []} initialArticleUrl={knowledgeGraphArticleUrl} />
               </div>
             ) : (
               <>
@@ -651,6 +611,10 @@ function App() {
                     portfolio={portfolio}
                     stocks={stocks}
                     mode={mode}
+                    onOpenKnowledgeGraph={(articleUrl) => {
+                      setKnowledgeGraphArticleUrl(articleUrl);
+                      setShowKnowledgeGraph(true);
+                    }}
                   />
                 </div>
               </>

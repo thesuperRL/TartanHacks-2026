@@ -60,9 +60,21 @@ class NewsScraper:
                         summary = entry.get('summary', '')
                         full_text = ''
                     
+                    # Validate and clean URL
+                    article_url = entry.link
+                    if not article_url or not isinstance(article_url, str):
+                        print(f"Warning: Invalid URL for article '{entry.title}': {article_url}")
+                        continue
+                    
+                    # Ensure URL is properly formatted
+                    article_url = article_url.strip()
+                    if not article_url.startswith(('http://', 'https://')):
+                        print(f"Warning: URL doesn't start with http:// or https://: {article_url}")
+                        continue
+                    
                     articles.append({
                         'title': entry.title,
-                        'url': entry.link,
+                        'url': article_url,
                         'summary': summary,
                         'published': entry.get('published', ''),
                         'source': feed.feed.get('title', 'Unknown'),

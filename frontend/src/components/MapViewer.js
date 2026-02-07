@@ -7,7 +7,7 @@ import { generateDemoArticles } from '../utils/generateDemoArticles';
 import { checkArticleImpact } from '../utils/checkArticleImpact';
 import './MapViewer.css';
 
-const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [], mode = 'economic' }) => {
+const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [], stocks = [], mode = 'economic', onOpenKnowledgeGraph }) => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [mapbox, setMapbox] = useState(null);
@@ -15,6 +15,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   const [mapLoaded, setMapLoaded] = useState(false);
   const markersRef = useRef([]);
   const popupsRef = useRef([]);
+  const markerArticleMapRef = useRef(new Map()); // Map marker to article ID
   const currentOpenPopupRef = useRef(null);
   const currentOpenMarkerRef = useRef(null);
   const [currentZoom, setCurrentZoom] = useState(2);
@@ -394,6 +395,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       if (popup) popup.remove();
     });
     popupsRef.current = [];
+    markerArticleMapRef.current.clear();
     currentOpenPopupRef.current = null;
     currentOpenMarkerRef.current = null;
 
@@ -618,7 +620,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
               box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
               transition: all 0.2s;
               cursor: pointer;
-            ">🧠 View Mind Map</button>
+            ">🧠 View Knowledge Graph</button>
             <button id="podcast-btn-${article.id}" style="
               display: inline-block;
               padding: 8px 16px;
@@ -689,15 +691,26 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
           });
         }
 
-        // Add Mind Map button handler
+        // Add Knowledge Graph button handler
         const mindMapBtn = document.getElementById(`mindmap-btn-${article.id}`);
         if (mindMapBtn && !mindMapBtn.dataset.handlersAttached) {
           mindMapBtn.dataset.handlersAttached = 'true';
           mindMapBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            setMindMapTitle(articleTitle);
-            setMindMapLocation(articleLocation);
-            setMindMapOpen(true);
+            // Open knowledge graph with article URL
+            // Try multiple possible URL properties
+            const articleUrl = article.url || article.link || article.source_url || article.article_url || null;
+            console.log('MapViewer: Opening knowledge graph with URL:', articleUrl, 'from article:', article);
+            if (onOpenKnowledgeGraph) {
+              if (articleUrl && !articleUrl.includes('example.com')) {
+                // Only use real URLs, not placeholder URLs
+                onOpenKnowledgeGraph(articleUrl);
+              } else {
+                // If no URL or placeholder URL, open knowledge graph without URL (user can enter manually)
+                console.log('MapViewer: No valid URL found in article (has placeholder or null), opening knowledge graph without URL');
+                onOpenKnowledgeGraph(null);
+              }
+            }
           });
         }
 
@@ -819,9 +832,148 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
 
       markersRef.current.push(marker);
       popupsRef.current.push(popup);
+      markerArticleMapRef.current.set(marker, article.id);
     });
 
   }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, mapBounds, demoArticles, stocks, portfolio, mode]);
+
+  // Handle selectedArticle changes from sidebar clicks - fly to location and show popup
+  useEffect(() => {
+    if (!mapRef.current || !mapbox || !mapLoaded || !selectedArticle) return;
+
+    const map = mapRef.current;
+    const articleId = selectedArticle.id;
+    
+    // Find the marker for the selected article using the map
+    let marker = null;
+    let markerIndex = -1;
+    
+    for (let i = 0; i < markersRef.current.length; i++) {
+      const m = markersRef.current[i];
+      if (markerArticleMapRef.current.get(m) === articleId) {
+        marker = m;
+        markerIndex = i;
+        break;
+      }
+    }
+
+    // If marker not found but article has coordinates, fly to location anyway
+    if (!marker && selectedArticle.coordinates?.lat && selectedArticle.coordinates?.lng) {
+      const { lat, lng } = selectedArticle.coordinates;
+      const coordinates = [lng, lat];
+      
+      // Fly to the location
+      map.flyTo({
+        center: coordinates,
+        zoom: 10,
+        duration: 1500,
+        essential: true
+      });
+      
+      // Try to find marker by coordinates after a delay (in case markers are still being created)
+      setTimeout(() => {
+        const foundMarker = markersRef.current.find(m => {
+          const markerLngLat = m.getLngLat();
+          return Math.abs(markerLngLat.lat - lat) < 0.001 && 
+                 Math.abs(markerLngLat.lng - lng) < 0.001;
+        });
+        
+        if (foundMarker) {
+          const foundIndex = markersRef.current.indexOf(foundMarker);
+          const foundPopup = popupsRef.current[foundIndex];
+          
+          if (foundPopup) {
+            // Close any existing popups
+            if (currentOpenPopupRef.current) {
+              try {
+                currentOpenPopupRef.current.remove();
+              } catch (e) {}
+            }
+            if (currentOpenMarkerRef.current) {
+              try {
+                const existingPopup = currentOpenMarkerRef.current.getPopup();
+                if (existingPopup) existingPopup.remove();
+                currentOpenMarkerRef.current.setPopup(null);
+              } catch (e) {}
+            }
+            
+            // Show the popup
+            currentOpenPopupRef.current = foundPopup;
+            currentOpenMarkerRef.current = foundMarker;
+            foundMarker.setPopup(foundPopup);
+            foundPopup.addTo(map);
+          }
+        }
+      }, 1600);
+      return;
+    }
+
+    if (!marker || markerIndex === -1) return;
+    
+    const popup = popupsRef.current[markerIndex];
+    if (!popup) return;
+
+    // Get coordinates from the marker
+    const markerLngLat = marker.getLngLat();
+    const coordinates = [markerLngLat.lng, markerLngLat.lat];
+
+    // Close any existing popups first
+    if (currentOpenPopupRef.current) {
+      try {
+        currentOpenPopupRef.current.remove();
+      } catch (e) {
+        console.warn('Error removing current popup:', e);
+      }
+      currentOpenPopupRef.current = null;
+    }
+    
+    if (currentOpenMarkerRef.current) {
+      try {
+        const existingPopup = currentOpenMarkerRef.current.getPopup();
+        if (existingPopup) existingPopup.remove();
+        currentOpenMarkerRef.current.setPopup(null);
+      } catch (e) {
+        console.warn('Error removing marker popup:', e);
+      }
+      currentOpenMarkerRef.current = null;
+    }
+
+    // Fly to the location with smooth animation
+    map.flyTo({
+      center: coordinates,
+      zoom: 10,
+      duration: 1500,
+      essential: true
+    });
+
+    // Show popup after flyTo animation starts
+    setTimeout(() => {
+      // Double-check no other popups are open
+      const existingPopups = map.getContainer().querySelectorAll('.mapboxgl-popup');
+      existingPopups.forEach(p => {
+        if (p && p.parentNode) {
+          p.remove();
+        }
+      });
+
+      // Set this as the current open popup and marker
+      currentOpenPopupRef.current = popup;
+      currentOpenMarkerRef.current = marker;
+
+      marker.setPopup(popup);
+      popup.addTo(map);
+
+      // Listen for popup close event to clear refs
+      popup.on('close', () => {
+        if (currentOpenPopupRef.current === popup) {
+          currentOpenPopupRef.current = null;
+        }
+        if (currentOpenMarkerRef.current === marker) {
+          currentOpenMarkerRef.current = null;
+        }
+      });
+    }, 300);
+  }, [selectedArticle, mapbox, mapLoaded, articles, demoArticles]);
 
   return (
     <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>

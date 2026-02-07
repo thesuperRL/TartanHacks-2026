@@ -103,27 +103,149 @@ const GraphEdge = ({ x1, y1, x2, y2, color = '#FF6B9D' }) => {
     );
 };
 
-const KnowledgeGraph = ({ portfolio, stocks }) => {
-    const [articleUrl, setArticleUrl] = useState('');
+const KnowledgeGraph = ({ portfolio, stocks, initialArticleUrl = null }) => {
+    // Initialize with initialArticleUrl if provided
+    const [articleUrl, setArticleUrl] = useState(initialArticleUrl || '');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [graphData, setGraphData] = useState(null);
     const [selectedNode, setSelectedNode] = useState(null);
     const svgRef = useRef(null);
+    const hasGeneratedRef = useRef(false);
+    const lastGeneratedUrlRef = useRef(null);
 
-    // Set demo data on mount
+    // Set demo data on mount (only if no initial article URL)
     useEffect(() => {
-        setGraphData({
-            article: { title: 'Demo: How Market Events Impact Your Portfolio', summary: 'This is a demo knowledge graph. Enter an article URL above to generate a real analysis of how news impacts your investments.' },
-            events: ['Market policy changes announced', 'Tech sector reacts to new regulations', 'Consumer confidence shifts'],
-            impacts: [
-                { stock: 'AAPL', type: 'positive', description: 'Benefits from increased consumer spending', reasoning: 'Strong brand loyalty provides buffer against market volatility' },
-                { stock: 'GOOGL', type: 'neutral', description: 'Mixed impact from regulatory changes', reasoning: 'Advertising revenue may be affected but cloud services remain strong' },
-                { stock: 'MSFT', type: 'negative', description: 'Enterprise spending may slow down', reasoning: 'Budget cuts in corporate sector affect software licensing' }
-            ],
-            reasoning: ['Tech sector resilience varies by sub-sector', 'Consumer-facing companies adapt faster to policy changes']
-        });
-    }, []);
+        if (!initialArticleUrl) {
+            setGraphData({
+                article: { title: 'Demo: How Market Events Impact Your Portfolio', summary: 'This is a demo knowledge graph. Enter an article URL above to generate a real analysis of how news impacts your investments.' },
+                events: ['Market policy changes announced', 'Tech sector reacts to new regulations', 'Consumer confidence shifts'],
+                impacts: [
+                    { stock: 'AAPL', type: 'positive', description: 'Benefits from increased consumer spending', reasoning: 'Strong brand loyalty provides buffer against market volatility' },
+                    { stock: 'GOOGL', type: 'neutral', description: 'Mixed impact from regulatory changes', reasoning: 'Advertising revenue may be affected but cloud services remain strong' },
+                    { stock: 'MSFT', type: 'negative', description: 'Enterprise spending may slow down', reasoning: 'Budget cuts in corporate sector affect software licensing' }
+                ],
+                reasoning: ['Tech sector resilience varies by sub-sector', 'Consumer-facing companies adapt faster to policy changes']
+            });
+        }
+    }, [initialArticleUrl]);
+
+    // Auto-generate graph if initialArticleUrl is provided
+    useEffect(() => {
+        console.log('KnowledgeGraph: initialArticleUrl changed:', initialArticleUrl);
+        if (initialArticleUrl && initialArticleUrl.trim()) {
+            console.log('KnowledgeGraph: Setting articleUrl and starting generation');
+            // Update the article URL input
+            setArticleUrl(initialArticleUrl);
+            
+            // Only generate if we haven't already generated for this URL
+            if (lastGeneratedUrlRef.current !== initialArticleUrl) {
+                console.log('KnowledgeGraph: New URL detected, will generate graph');
+                lastGeneratedUrlRef.current = initialArticleUrl;
+                hasGeneratedRef.current = false;
+                
+                // Clear any existing graph data
+                setGraphData(null);
+                setError(null);
+                
+                // Start generation after a short delay to ensure state is updated
+                const timer = setTimeout(async () => {
+                    console.log('KnowledgeGraph: Starting auto-generation for URL:', initialArticleUrl);
+                    // Use the initialArticleUrl directly since state might not be updated yet
+                    const urlToUse = initialArticleUrl.trim();
+                    if (!urlToUse) {
+                        setError('Please enter an article URL');
+                        return;
+                    }
+                    
+                    // Prevent duplicate generation
+                    if (hasGeneratedRef.current && lastGeneratedUrlRef.current === urlToUse) {
+                        return;
+                    }
+                    
+                    hasGeneratedRef.current = true;
+                    setLoading(true);
+                    setError(null);
+
+                    try {
+                        // Extract stock symbols from stocks array (handle both object and string formats)
+                        const stockSymbols = [];
+                        if (stocks && Array.isArray(stocks)) {
+                            stocks.forEach(s => {
+                                if (typeof s === 'string') {
+                                    stockSymbols.push(s);
+                                } else if (s && s.symbol) {
+                                    stockSymbols.push(s.symbol);
+                                }
+                            });
+                        }
+                        
+                        // Also check portfolio if it has stocks
+                        if (portfolio && Array.isArray(portfolio)) {
+                            portfolio.forEach(s => {
+                                if (typeof s === 'string' && !stockSymbols.includes(s)) {
+                                    stockSymbols.push(s);
+                                } else if (s && s.symbol && !stockSymbols.includes(s.symbol)) {
+                                    stockSymbols.push(s.symbol);
+                                }
+                            });
+                        }
+
+                        console.log('Sending request with stocks:', stockSymbols);
+
+                        const response = await fetch(`${API_BASE_URL}/knowledge-graph`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                article_url: urlToUse,
+                                portfolio_stocks: stockSymbols,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            let errorData;
+                            try {
+                                errorData = JSON.parse(errorText);
+                            } catch {
+                                errorData = { message: errorText || `HTTP error! status: ${response.status}` };
+                            }
+                            throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        console.log('Knowledge graph data received:', data);
+                        
+                        // Validate and set graph data
+                        if (data.status === 'error') {
+                            throw new Error(data.message || 'Failed to generate knowledge graph');
+                        }
+                        
+                        // Ensure data has the expected structure
+                        const graphData = {
+                            article: data.article || { title: 'Article', summary: '' },
+                            events: data.events || [],
+                            impacts: data.impacts || [],
+                            reasoning: data.reasoning || []
+                        };
+                        
+                        setGraphData(graphData);
+                    } catch (err) {
+                        console.error('Error generating knowledge graph:', err);
+                        setError(err.message || 'Failed to generate knowledge graph. Please check the article URL and try again.');
+                        hasGeneratedRef.current = false;
+                    } finally {
+                        setLoading(false);
+                    }
+                }, 200);
+                return () => clearTimeout(timer);
+            }
+        } else {
+            // Reset refs when initialArticleUrl is cleared
+            lastGeneratedUrlRef.current = null;
+            hasGeneratedRef.current = false;
+        }
+    }, [initialArticleUrl, portfolio, stocks]);
 
     const generateKnowledgeGraph = async () => {
         if (!articleUrl.trim()) {

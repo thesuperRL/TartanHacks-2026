@@ -271,7 +271,14 @@ class NewsProcessor:
         try:
             if os.path.exists(self.articles_file):
                 with open(self.articles_file, 'r') as f:
-                    self.processed_articles = json.load(f)
+                    loaded_articles = json.load(f)
+                    # Filter out articles without valid URLs
+                    self.processed_articles = [
+                        a for a in loaded_articles 
+                        if a.get('url') and isinstance(a.get('url'), str) and a.get('url').strip().startswith(('http://', 'https://'))
+                    ]
+                    if len(loaded_articles) != len(self.processed_articles):
+                        print(f"Filtered out {len(loaded_articles) - len(self.processed_articles)} articles without valid URLs")
         except Exception as e:
             print(f"Error loading articles: {e}")
             self.processed_articles = []
@@ -1975,11 +1982,22 @@ Respond with ONLY one word: "financial" or "political"."""
             else:  # default to economic
                 transformed_title = self._make_title_finance_oriented(original_title)
             
-            # Create processed article
+            # Validate and preserve URL
+            article_url = article.get('url', '')
+            if not article_url or not isinstance(article_url, str) or not article_url.strip():
+                print(f"Warning: Article '{original_title[:50]}...' has no valid URL, skipping")
+                continue
+            
+            article_url = article_url.strip()
+            if not article_url.startswith(('http://', 'https://')):
+                print(f"Warning: Article '{original_title[:50]}...' has invalid URL format: {article_url}, skipping")
+                continue
+            
+            # Create processed article with validated URL
             processed_article = {
-                'id': f"article_{i}_{hash(article.get('url', ''))}",
+                'id': f"article_{i}_{hash(article_url)}",
                 'title': transformed_title,
-                'url': article.get('url', ''),
+                'url': article_url,  # Use validated URL
                 'summary': article.get('summary', ''),
                 'category': category,
                 'source': article.get('source', 'Unknown'),
@@ -2096,12 +2114,14 @@ Respond with ONLY one word: "financial" or "political"."""
     
     def get_articles_by_category(self, category: str = 'all') -> List[Dict]:
         """Get articles filtered by category"""
-        if category == 'all':
-            return self.processed_articles
-        return [a for a in self.processed_articles if a.get('category') == category]
+        articles = self.processed_articles if category == 'all' else [a for a in self.processed_articles if a.get('category') == category]
+        # Filter out articles without valid URLs
+        return [a for a in articles if a.get('url') and isinstance(a.get('url'), str) and a.get('url').strip().startswith(('http://', 'https://'))]
     
     def get_popular_articles(self, category: str = 'all', limit: int = 20) -> List[Dict]:
         """Get most popular articles, sorted by popularity score"""
         articles = self.get_articles_by_category(category)
-        sorted_articles = sorted(articles, key=lambda x: x.get('popularity_score', 0), reverse=True)
+        # Ensure all articles have valid URLs before sorting
+        valid_articles = [a for a in articles if a.get('url') and isinstance(a.get('url'), str) and a.get('url').strip().startswith(('http://', 'https://'))]
+        sorted_articles = sorted(valid_articles, key=lambda x: x.get('popularity_score', 0), reverse=True)
         return sorted_articles[:limit]
