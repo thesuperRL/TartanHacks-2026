@@ -6,9 +6,9 @@ import PredictionResults from './PredictionResults';
 import DailyDigestVideo from './DailyDigestVideo';
 import './Sidebar.css';
 
-const Sidebar = ({ 
-  popularArticles, 
-  onArticleClick, 
+const Sidebar = ({
+  popularArticles,
+  onArticleClick,
   selectedArticle,
   portfolioMinimized,
   onPortfolioMinimize,
@@ -47,7 +47,7 @@ const Sidebar = ({
     <div className="sidebar" style={{ top: `${headerHeight}px`, height: `${availableHeight}px` }}>
       {/* Important Articles Section */}
       <div className={`sidebar-section ${importantArticlesMinimized ? 'minimized' : ''}`}>
-        <div 
+        <div
           className="sidebar-section-header"
           onClick={() => setImportantArticlesMinimized(!importantArticlesMinimized)}
         >
@@ -55,7 +55,7 @@ const Sidebar = ({
             <span className="section-icon">⚠️</span>
             <span>Important Articles</span>
           </div>
-          <button 
+          <button
             className="section-toggle"
             onClick={(e) => {
               e.stopPropagation();
@@ -67,7 +67,7 @@ const Sidebar = ({
           </button>
         </div>
         <div className={`sidebar-section-content ${importantArticlesMinimized ? 'minimized' : ''}`}>
-          <ImportantArticlesList 
+          <ImportantArticlesList
             articles={popularArticles}
             stocks={stocks}
             portfolio={portfolio}
@@ -79,7 +79,7 @@ const Sidebar = ({
 
       {/* Articles Section */}
       <div className={`sidebar-section ${articlesMinimized ? 'minimized' : ''}`}>
-        <div 
+        <div
           className="sidebar-section-header"
           onClick={() => onArticlesMinimize(!articlesMinimized)}
         >
@@ -87,7 +87,7 @@ const Sidebar = ({
             <span className="section-icon">📰</span>
             <span>Articles</span>
           </div>
-          <button 
+          <button
             className="section-toggle"
             onClick={(e) => {
               e.stopPropagation();
@@ -99,7 +99,7 @@ const Sidebar = ({
           </button>
         </div>
         <div className={`sidebar-section-content ${articlesMinimized ? 'minimized' : ''}`}>
-          <ArticlesList 
+          <ArticlesList
             articles={popularArticles}
             onArticleClick={onArticleClick}
             selectedArticle={selectedArticle}
@@ -116,7 +116,7 @@ const Sidebar = ({
           </div>
         </div>
         <div className="sidebar-section-content">
-          <DailyDigestVideo 
+          <DailyDigestVideo
             portfolio={portfolio}
             stocks={stocks}
             predictions={predictions}
@@ -126,7 +126,7 @@ const Sidebar = ({
 
       {/* Portfolio Section */}
       <div className={`sidebar-section ${portfolioMinimized ? 'minimized' : ''}`}>
-        <div 
+        <div
           className="sidebar-section-header"
           onClick={() => onPortfolioMinimize(!portfolioMinimized)}
         >
@@ -134,7 +134,7 @@ const Sidebar = ({
             <span className="section-icon">💼</span>
             <span>Your Portfolio</span>
           </div>
-          <button 
+          <button
             className="section-toggle"
             onClick={(e) => {
               e.stopPropagation();
@@ -153,7 +153,7 @@ const Sidebar = ({
       {/* Predictions Section */}
       {(predictions || predictionsLoading) && (
         <div className={`sidebar-section ${predictionMinimized ? 'minimized' : ''}`}>
-          <div 
+          <div
             className="sidebar-section-header"
             onClick={() => onPredictionMinimize(!predictionMinimized)}
           >
@@ -161,7 +161,7 @@ const Sidebar = ({
               <span className="section-icon">📊</span>
               <span>Stock Predictions</span>
             </div>
-            <button 
+            <button
               className="section-toggle"
               onClick={(e) => {
                 e.stopPropagation();
@@ -173,7 +173,7 @@ const Sidebar = ({
             </button>
           </div>
           <div className={`sidebar-section-content ${predictionMinimized ? 'minimized' : ''}`}>
-            <PredictionResults 
+            <PredictionResults
               predictions={predictions}
               loading={predictionsLoading}
               article={selectedArticle}
