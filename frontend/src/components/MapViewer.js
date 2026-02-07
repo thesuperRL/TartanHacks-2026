@@ -89,6 +89,130 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
 
         // Apply dark theme colors
         try {
+          // Background
+          if (mapInstance.getLayer('background')) {
+            mapInstance.setPaintProperty('background', 'background-color', '#0f0c29');
+          }
+
+          // Water layers
+          ['water', 'waterway'].forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              const layer = mapInstance.getLayer(layerId);
+              try {
+                if (layer.type === 'fill') {
+                  mapInstance.setPaintProperty(layerId, 'fill-color', '#0a0e27');
+                } else if (layer.type === 'line') {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#0a0e27');
+                }
+              } catch (e) {
+                // Layer might not support these properties
+              }
+            }
+          });
+
+          // Land layers
+          if (mapInstance.getLayer('land')) {
+            try {
+              mapInstance.setPaintProperty('land', 'fill-color', '#302b63');
+            } catch (e) {
+              // Try alternative property
+              try {
+                mapInstance.setPaintProperty('land', 'background-color', '#302b63');
+              } catch (e2) {
+                console.warn('Could not set land color');
+              }
+            }
+          }
+
+          // Other land-related layers
+          ['landuse', 'national-park', 'land-structure-polygon'].forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              const layer = mapInstance.getLayer(layerId);
+              try {
+                if (layer.type === 'fill') {
+                  mapInstance.setPaintProperty(layerId, 'fill-color', '#302b63');
+                  mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.85);
+                } else if (layer.type === 'line') {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#302b63');
+                  mapInstance.setPaintProperty(layerId, 'line-opacity', 0.85);
+                }
+              } catch (e) {
+                // Layer might not support these properties
+              }
+            }
+          });
+
+          // National parks
+          if (mapInstance.getLayer('national-park')) {
+            try {
+              const parkLayer = mapInstance.getLayer('national-park');
+              if (parkLayer.type === 'fill') {
+                mapInstance.setPaintProperty('national-park', 'fill-color', '#24243e');
+                mapInstance.setPaintProperty('national-park', 'fill-opacity', 0.8);
+              }
+            } catch (e) {
+              // Ignore
+            }
+          }
+
+          // Buildings
+          ['building', 'building-extrusion'].forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              try {
+                mapInstance.setPaintProperty(layerId, 'fill-color', '#8b5cf6');
+                mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.3);
+              } catch (e) {
+                // Ignore
+              }
+            }
+          });
+
+          // Boundaries - less pronounced
+          ['admin-0-boundary', 'admin-1-boundary', 'admin-0-boundary-bg'].forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              try {
+                const isCountry = layerId.includes('admin-0');
+                mapInstance.setPaintProperty(layerId, 'line-color', isCountry ? '#4a9eff' : '#8b5cf6');
+                mapInstance.setPaintProperty(layerId, 'line-opacity', isCountry ? 0.15 : 0.1);
+                // Make lines thinner if possible
+                try {
+                  mapInstance.setPaintProperty(layerId, 'line-width', isCountry ? 0.5 : 0.3);
+                } catch (e) {
+                  // Some layers might not support line-width
+                }
+              } catch (e) {
+                // Ignore
+              }
+            }
+          });
+
+          // Roads
+          const roadLayers = ['road-street', 'road-primary', 'road-secondary', 'road-highway'];
+          roadLayers.forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              try {
+                if (layerId.includes('highway')) {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#4a9eff');
+                  mapInstance.setPaintProperty(layerId, 'line-opacity', 0.5);
+                } else {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#1a1a2e');
+                  mapInstance.setPaintProperty(layerId, 'line-opacity', 0.3);
+                }
+              } catch (e) {
+                // Ignore
+              }
+            }
+          });
+
+          console.log('Custom theme colors applied');
+        } catch (e) {
+          console.warn('Error applying theme:', e);
+        }
+      });
+
+      // Also apply colors on style.load (in case style loads after initial load)
+      const applyThemeColors = () => {
+        try {
           if (mapInstance.getLayer('background')) {
             mapInstance.setPaintProperty('background', 'background-color', '#0f0c29');
           }
@@ -96,26 +220,56 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
           ['water', 'waterway'].forEach(layerId => {
             if (mapInstance.getLayer(layerId)) {
               const layer = mapInstance.getLayer(layerId);
-              if (layer.type === 'fill') {
-                mapInstance.setPaintProperty(layerId, 'fill-color', '#0a0e27');
-              }
+              try {
+                if (layer.type === 'fill') {
+                  mapInstance.setPaintProperty(layerId, 'fill-color', '#0a0e27');
+                } else if (layer.type === 'line') {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#0a0e27');
+                }
+              } catch (e) {}
             }
           });
 
           if (mapInstance.getLayer('land')) {
-            mapInstance.setPaintProperty('land', 'fill-color', '#302b63');
+            try {
+              mapInstance.setPaintProperty('land', 'fill-color', '#302b63');
+            } catch (e) {
+              try {
+                mapInstance.setPaintProperty('land', 'background-color', '#302b63');
+              } catch (e2) {}
+            }
           }
+
+          ['landuse', 'national-park', 'land-structure-polygon'].forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              const layer = mapInstance.getLayer(layerId);
+              try {
+                if (layer.type === 'fill') {
+                  mapInstance.setPaintProperty(layerId, 'fill-color', '#302b63');
+                  mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.85);
+                }
+              } catch (e) {}
+            }
+          });
 
           ['admin-0-boundary', 'admin-1-boundary'].forEach(layerId => {
             if (mapInstance.getLayer(layerId)) {
-              mapInstance.setPaintProperty(layerId, 'line-color', '#4a9eff');
-              mapInstance.setPaintProperty(layerId, 'line-opacity', 0.4);
+              try {
+                const isCountry = layerId.includes('admin-0');
+                mapInstance.setPaintProperty(layerId, 'line-color', isCountry ? '#4a9eff' : '#8b5cf6');
+                mapInstance.setPaintProperty(layerId, 'line-opacity', isCountry ? 0.15 : 0.1);
+                try {
+                  mapInstance.setPaintProperty(layerId, 'line-width', isCountry ? 0.5 : 0.3);
+                } catch (e) {}
+              } catch (e) {}
             }
           });
         } catch (e) {
-          console.warn('Error applying theme:', e);
+          console.warn('Error applying theme on style.load:', e);
         }
-      });
+      };
+
+      mapInstance.on('style.load', applyThemeColors);
 
       window.addEventListener('resize', () => mapInstance.resize());
 
