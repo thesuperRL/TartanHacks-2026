@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../config/firebase';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import './SettingsModal.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-
 const SettingsModal = ({ isOpen, onClose, onStocksUpdate }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [stocks, setStocks] = useState([]);
   const [newStock, setNewStock] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,58 +28,49 @@ const SettingsModal = ({ isOpen, onClose, onStocksUpdate }) => {
   ]);
 
   useEffect(() => {
-    if (!isOpen || !isAuthenticated) return;
+    if (!isOpen || !isAuthenticated || !user?.uid) return;
 
-    const loadStocks = async () => {
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(`${API_BASE_URL}/portfolio`, {
-          headers: {
-            'Authorization': token || '',
-          },
-        });
+    const portfolioRef = doc(db, 'portfolios', user.uid);
 
-        if (response.ok) {
-          const data = await response.json();
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(
+      portfolioRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
           setStocks(data.stocks || []);
+        } else {
+          setStocks([]);
         }
-      } catch (error) {
+        setLoading(false);
+      },
+      (error) => {
         console.error('Error loading portfolio:', error);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    loadStocks();
-  }, [isOpen, isAuthenticated]);
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, [isOpen, isAuthenticated, user?.uid]);
 
   const saveStocks = async (stocksToSave) => {
+    if (!user?.uid) return;
+    
     setSaving(true);
     setSaveStatus(null);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/portfolio`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token || '',
-        },
-        body: JSON.stringify({ stocks: stocksToSave }),
-      });
-
-      if (response.ok) {
-        setSaveStatus('saved');
-        // Trigger update event for PortfolioOverlay
-        window.dispatchEvent(new Event('stocksUpdated'));
-        if (onStocksUpdate) {
-          onStocksUpdate(stocksToSave);
-        }
-        // Clear status message after 2 seconds
-        setTimeout(() => setSaveStatus(null), 2000);
-      } else {
-        setSaveStatus('error');
-        console.error('Failed to save portfolio');
+      const portfolioRef = doc(db, 'portfolios', user.uid);
+      await setDoc(portfolioRef, { stocks: stocksToSave }, { merge: true });
+      
+      setSaveStatus('saved');
+      // Trigger update event for PortfolioOverlay (though Firestore listener should handle this)
+      window.dispatchEvent(new Event('stocksUpdated'));
+      if (onStocksUpdate) {
+        onStocksUpdate(stocksToSave);
       }
+      // Clear status message after 2 seconds
+      setTimeout(() => setSaveStatus(null), 2000);
     } catch (error) {
       setSaveStatus('error');
       console.error('Error saving portfolio:', error);

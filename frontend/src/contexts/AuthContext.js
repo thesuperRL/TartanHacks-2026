@@ -1,4 +1,13 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  updateProfile
+} from 'firebase/auth';
+import { auth, googleProvider } from '../config/firebase';
 
 const AuthContext = createContext(null);
 
@@ -15,37 +24,95 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored authentication on mount
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('authToken');
-    
-    if (storedUser && storedToken) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('authToken');
-      }
+    // Check if Firebase is properly configured
+    if (!auth || !auth.app || auth.app.options.projectId === 'missing-config') {
+      console.warn('Firebase not configured - authentication will not work');
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(
+      auth, 
+      (firebaseUser) => {
+        if (firebaseUser) {
+          // User is signed in
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            photoURL: firebaseUser.photoURL
+          });
+        } else {
+          // User is signed out
+          setUser(null);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Firebase auth state error:', error);
+        setLoading(false);
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
-  const login = (userData, token) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('authToken', token);
+  const signUp = async (email, password, name) => {
+    if (!auth || !auth.app || auth.app.options.projectId === 'missing-config') {
+      return { success: false, error: 'Firebase is not configured. Please set up Firebase first.' };
+    }
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Update user profile with name
+      if (name && userCredential.user) {
+        await updateProfile(userCredential.user, { displayName: name });
+      }
+      return { success: true, user: userCredential.user };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('authToken');
+  const signIn = async (email, password) => {
+    if (!auth || !auth.app || auth.app.options.projectId === 'missing-config') {
+      return { success: false, error: 'Firebase is not configured. Please set up Firebase first.' };
+    }
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      return { success: true, user: userCredential.user };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    if (!auth || !auth.app || auth.app.options.projectId === 'missing-config') {
+      return { success: false, error: 'Firebase is not configured. Please set up Firebase first.' };
+    }
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      return { success: true, user: result.user };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await firebaseSignOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const value = {
     user,
-    login,
+    signUp,
+    signIn,
+    signInWithGoogle,
     logout,
     loading,
     isAuthenticated: !!user

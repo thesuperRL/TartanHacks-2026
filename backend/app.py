@@ -25,11 +25,13 @@ CORS(app,
 scraper = NewsScraper()
 processor = NewsProcessor()
 
+# DEPRECATED: Authentication and portfolio storage moved to Firebase
+# Keeping these for backward compatibility, but they're no longer used
 # Simple in-memory user storage (in production, use a database)
 users_db = {}
 tokens_db = {}
 
-# Portfolio storage file
+# Portfolio storage file (DEPRECATED - now using Firebase Firestore)
 PORTFOLIOS_FILE = 'portfolios.json'
 
 def generate_token():
@@ -120,6 +122,8 @@ def refresh_news():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# DEPRECATED: Authentication endpoints - now using Firebase
+# Keeping for backward compatibility
 @app.route('/api/auth/signup', methods=['POST', 'OPTIONS'])
 @cross_origin()
 def signup():
@@ -172,6 +176,7 @@ def signup():
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
+# DEPRECATED: Authentication endpoints - now using Firebase
 @app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
 @cross_origin()
 def login():
@@ -211,6 +216,7 @@ def login():
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
+# DEPRECATED: Authentication endpoints - now using Firebase
 @app.route('/api/auth/google', methods=['POST', 'OPTIONS'])
 @cross_origin()
 def google_auth():
@@ -305,6 +311,7 @@ def google_auth():
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
+# DEPRECATED: Portfolio endpoints - now using Firebase Firestore
 @app.route('/api/portfolio', methods=['GET', 'OPTIONS'])
 @cross_origin()
 def get_portfolio():
@@ -321,6 +328,7 @@ def get_portfolio():
     
     return jsonify({'stocks': user_portfolio}), 200
 
+# DEPRECATED: Portfolio endpoints - now using Firebase Firestore
 @app.route('/api/portfolio', methods=['POST', 'PUT', 'OPTIONS'])
 @cross_origin()
 def save_portfolio():

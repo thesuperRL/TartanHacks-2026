@@ -1,97 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../config/firebase';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import './PortfolioOverlay.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
-
 const PortfolioOverlay = ({ isWindow = false }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [stocks, setStocks] = useState([]);
   const [newStock, setNewStock] = useState('');
   const [isOpen, setIsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  // Load stocks from backend
+  // Load stocks from Firestore
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !user?.uid) return;
 
-    const loadStocks = async () => {
-      try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(`${API_BASE_URL}/portfolio`, {
-          headers: {
-            'Authorization': token || '',
-          },
-        });
+    const portfolioRef = doc(db, 'portfolios', user.uid);
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.stocks && data.stocks.length > 0) {
-            setStocks(data.stocks);
-          } else {
-            // Default stocks for new users
-            const defaultStocks = [
-              { symbol: 'AAPL', name: 'Apple Inc.', price: 0, change: 0 },
-              { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 0, change: 0 },
-              { symbol: 'MSFT', name: 'Microsoft Corp.', price: 0, change: 0 },
-            ];
-            setStocks(defaultStocks);
-            await saveStocks(defaultStocks);
-          }
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(
+      portfolioRef,
+      async (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setStocks(data.stocks || []);
         } else {
-          console.error('Failed to load portfolio');
-          // Fallback to default stocks
-          setStocks([
+          // No portfolio exists, create default one
+          const defaultStocks = [
             { symbol: 'AAPL', name: 'Apple Inc.', price: 0, change: 0 },
             { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 0, change: 0 },
             { symbol: 'MSFT', name: 'Microsoft Corp.', price: 0, change: 0 },
-          ]);
+          ];
+          setStocks(defaultStocks);
+          await setDoc(portfolioRef, { stocks: defaultStocks });
         }
-      } catch (error) {
+        setLoading(false);
+      },
+      (error) => {
         console.error('Error loading portfolio:', error);
-        // Fallback to default stocks
-        setStocks([
-          { symbol: 'AAPL', name: 'Apple Inc.', price: 0, change: 0 },
-          { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 0, change: 0 },
-          { symbol: 'MSFT', name: 'Microsoft Corp.', price: 0, change: 0 },
-        ]);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    loadStocks();
-
-    // Listen for stock updates from settings modal
-    window.addEventListener('stocksUpdated', loadStocks);
-    return () => window.removeEventListener('stocksUpdated', loadStocks);
-  }, [isAuthenticated]);
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, [isAuthenticated, user?.uid]);
 
   const saveStocks = async (stocksToSave) => {
+    if (!user?.uid) return;
+    
     try {
-      const token = localStorage.getItem('authToken');
-      await fetch(`${API_BASE_URL}/portfolio`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token || '',
-        },
-        body: JSON.stringify({ stocks: stocksToSave }),
-      });
+      const portfolioRef = doc(db, 'portfolios', user.uid);
+      await setDoc(portfolioRef, { stocks: stocksToSave }, { merge: true });
     } catch (error) {
       console.error('Error saving portfolio:', error);
     }
   };
 
-  // Save stocks to backend when they change (but not on initial load)
-  useEffect(() => {
-    if (stocks.length > 0 && !loading) {
-      saveStocks(stocks);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stocks]);
-
   // Mock stock price updates (in production, use a real API)
+  // Note: Price updates don't trigger Firestore saves to avoid unnecessary writes
   useEffect(() => {
     const updatePrices = () => {
       setStocks(prevStocks => 
