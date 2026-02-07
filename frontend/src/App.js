@@ -390,15 +390,31 @@ function App() {
         generateFakeArticle(),
         generateFakeArticle()
       ];
-      setPopularArticles(prev => [...newArticles, ...prev.slice(0, 3)]);
+      const fakeArticlesWithPrev = [...newArticles, ...popularArticles.slice(0, 3)];
+      setPopularArticles(fakeArticlesWithPrev);
       
       // Also try to fetch real news if backend is available
       try {
         await fetch(`${API_BASE_URL}/news/refresh`, { method: 'POST' });
         await fetchNews();
-        await fetchPopularNews();
+        
+        // Fetch popular news but preserve fake articles if fetch fails
+        try {
+          const response = await fetch(`${API_BASE_URL}/news/popular?category=all`);
+          if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data) && data.length > 0) {
+              setPopularArticles(data);
+            }
+            // If backend returns empty, keep the fake articles
+          }
+        } catch (fetchErr) {
+          console.log('Backend news fetch failed, keeping generated articles');
+          // Keep the fake articles that were already set
+        }
       } catch (err) {
         console.log('Backend news unavailable, using generated articles');
+        // Keep the fake articles that were already set
       }
     } catch (error) {
       console.error('Error refreshing news:', error);
