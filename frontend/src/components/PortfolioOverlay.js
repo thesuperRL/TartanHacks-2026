@@ -487,12 +487,13 @@ const PortfolioOverlay = ({ isWindow = false }) => {
                         >
                           📈 Predicted: {prediction.predictedChange >= 0 ? '+' : ''}{prediction.predictedChange}%
                         </div>
-                        {isExpanded && (
-                          <div className="prediction-details">
-                            <div className="prediction-price">
-                              Predicted Price: ${prediction.predictedPrice}
-                            </div>
-                            {prediction.predictedPrices && prediction.predictedPrices.length > 0 && (
+                        <div className={`prediction-details ${isExpanded ? 'expanded' : ''}`}>
+                          {isExpanded && (
+                            <>
+                              <div className="prediction-price">
+                                Predicted Price: ${prediction.predictedPrice}
+                              </div>
+                              {prediction.predictedPrices && prediction.predictedPrices.length > 0 && (
                               <div className="prediction-chart">
                                 <StockPriceChart
                                   symbol={stock.symbol}
@@ -512,8 +513,9 @@ const PortfolioOverlay = ({ isWindow = false }) => {
                                 ✓ Based on recent news analysis
                               </div>
                             )}
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                     {predictionsLoading && !prediction && (

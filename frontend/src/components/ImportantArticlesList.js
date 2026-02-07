@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { checkArticleImpact } from '../utils/checkArticleImpact';
 import './ImportantArticlesList.css';
 
 const ImportantArticlesList = ({ articles, stocks, portfolio, onArticleClick, selectedArticle }) => {
+  const articlesContainerRef = useRef(null);
   // Filter articles that impact holdings
   // Also check demo articles from MapViewer if needed
   const allArticles = articles || [];
@@ -18,6 +19,30 @@ const ImportantArticlesList = ({ articles, stocks, portfolio, onArticleClick, se
     };
   });
 
+  // Animate important articles appearing with emphasis
+  useEffect(() => {
+    if (importantArticles.length === 0) return;
+    
+    const timer = setTimeout(() => {
+      const articleCards = articlesContainerRef.current?.querySelectorAll('.article-card');
+      if (articleCards && articleCards.length > 0) {
+        articleCards.forEach((card, index) => {
+          card.style.opacity = '0';
+          card.style.transform = 'translateX(-30px) scale(0.95)';
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              card.style.transition = 'opacity 0.5s ease-out, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+              card.style.opacity = '1';
+              card.style.transform = 'translateX(0) scale(1)';
+            }, index * 80);
+          });
+        });
+      }
+    }, 50);
+    
+    return () => clearTimeout(timer);
+  }, [importantArticles.length]);
+
   return (
     <div className="important-articles-list">
       <p className="subtitle">
@@ -26,7 +51,7 @@ const ImportantArticlesList = ({ articles, stocks, portfolio, onArticleClick, se
           : 'No articles found that impact your holdings'}
       </p>
       
-      <div className="articles-container">
+      <div ref={articlesContainerRef} className="articles-container">
         {importantArticles.length === 0 ? (
           <div className="empty-state">
             <p>No important articles at this time. Articles that mention your holdings will appear here.</p>

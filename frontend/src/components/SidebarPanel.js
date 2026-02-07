@@ -224,11 +224,9 @@ const SidebarPanel = ({
           </button>
         </div>
       </div>
-      {!isMinimized && (
-        <div className="panel-content">
-          {children}
-        </div>
-      )}
+      <div className={`panel-content ${isMinimized ? 'minimized' : ''}`}>
+        {children}
+      </div>
     </div>
   );
 };

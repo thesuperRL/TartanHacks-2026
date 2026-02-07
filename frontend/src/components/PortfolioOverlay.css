@@ -180,14 +180,18 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0;
-  transform: translateX(-50px);
+  transform: translateX(-50px) translateZ(0);
   will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-transform: translateX(-50px) translateZ(0);
 }
 
 .stock-item.animate-in {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateX(0) translateZ(0);
   transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-transform: translateX(0) translateZ(0);
 }
 
 .stock-item:hover {
@@ -278,7 +282,31 @@
   padding: 4px 10px;
   border-radius: 6px;
   margin-top: 4px;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.prediction-badge::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+}
+
+.prediction-badge:hover::before {
+  width: 200px;
+  height: 200px;
 }
 
 .prediction-badge.positive {
@@ -294,8 +322,14 @@
 }
 
 .prediction-badge:hover {
-  transform: scale(1.05);
-  opacity: 0.9;
+  transform: scale(1.1) translateY(-2px);
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.prediction-badge:active {
+  transform: scale(0.95);
+  transition: transform 0.1s ease-out;
 }
 
 .prediction-details {
@@ -306,6 +340,26 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 11px;
   line-height: 1.5;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-10px);
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s,
+              margin 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+  will-change: max-height, opacity, transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.prediction-details.expanded {
+  max-height: 2000px;
+  opacity: 1;
+  transform: translateY(0);
+  padding: 10px;
+  margin-top: 8px;
 }
 
 .prediction-price {

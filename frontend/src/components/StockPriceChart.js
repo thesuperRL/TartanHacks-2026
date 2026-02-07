@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import './StockPriceChart.css';
 
 /**
@@ -17,6 +17,9 @@ const StockPriceChart = ({
   symbol = 'STOCK',
   explanation = ''
 }) => {
+  const historicalPathRef = useRef(null);
+  const predictedPathRef = useRef(null);
+  
   const { paths, min, max, xScale, yScale } = useMemo(() => {
     const allPrices = [...historicalPrices, ...predictedPrices].filter(p => p !== null && p !== undefined && !isNaN(p));
     
@@ -84,6 +87,33 @@ const StockPriceChart = ({
   const change = predictedFinal - currentPrice;
   const changePercent = currentPrice !== 0 ? (change / currentPrice) * 100 : 0;
 
+  // Animate chart paths drawing
+  useEffect(() => {
+    if (historicalPathRef.current && paths.historical) {
+      const path = historicalPathRef.current;
+      const length = path.getTotalLength();
+      path.style.strokeDasharray = `${length} ${length}`;
+      path.style.strokeDashoffset = length;
+      path.style.transition = 'stroke-dashoffset 1.5s ease-out';
+      requestAnimationFrame(() => {
+        path.style.strokeDashoffset = '0';
+      });
+    }
+    
+    if (predictedPathRef.current && paths.predicted) {
+      const path = predictedPathRef.current;
+      const length = path.getTotalLength();
+      path.style.strokeDasharray = `${length} ${length}`;
+      path.style.strokeDashoffset = length;
+      path.style.transition = 'stroke-dashoffset 1.5s ease-out 0.3s';
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          path.style.strokeDashoffset = '0';
+        }, 300);
+      });
+    }
+  }, [paths.historical, paths.predicted]);
+
   return (
     <div className="stock-price-chart">
       <div className="chart-header">
@@ -132,6 +162,7 @@ const StockPriceChart = ({
         {paths.historical && (
           <>
             <path
+              ref={historicalPathRef}
               d={paths.historical}
               stroke="#4a9eff"
               strokeWidth="2.5"
@@ -145,13 +176,13 @@ const StockPriceChart = ({
         {/* Predicted prices path */}
         {paths.predicted && (
           <path
+            ref={predictedPathRef}
             d={paths.predicted}
             stroke="#ff6b6b"
             strokeWidth="2.5"
             fill="none"
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeDasharray="none"
           />
         )}
 

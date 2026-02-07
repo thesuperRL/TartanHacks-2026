@@ -153,7 +153,10 @@ const PodcastPlayer = ({ isOpen, onClose, articleTitle, location }) => {
                 }}
               />
               
-              <button className="play-pause-button" onClick={togglePlay}>
+              <button 
+                className={`play-pause-button ${isPlaying ? 'playing' : ''}`} 
+                onClick={togglePlay}
+              >
                 {isPlaying ? '⏸' : '▶'}
               </button>
               

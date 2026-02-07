@@ -66,17 +66,15 @@ const Sidebar = ({
             {importantArticlesMinimized ? '□' : '−'}
           </button>
         </div>
-        {!importantArticlesMinimized && (
-          <div className="sidebar-section-content">
-            <ImportantArticlesList 
-              articles={popularArticles}
-              stocks={stocks}
-              portfolio={portfolio}
-              onArticleClick={onArticleClick}
-              selectedArticle={selectedArticle}
-            />
-          </div>
-        )}
+        <div className={`sidebar-section-content ${importantArticlesMinimized ? 'minimized' : ''}`}>
+          <ImportantArticlesList 
+            articles={popularArticles}
+            stocks={stocks}
+            portfolio={portfolio}
+            onArticleClick={onArticleClick}
+            selectedArticle={selectedArticle}
+          />
+        </div>
       </div>
 
       {/* Articles Section */}
@@ -100,15 +98,13 @@ const Sidebar = ({
             {articlesMinimized ? '□' : '−'}
           </button>
         </div>
-        {!articlesMinimized && (
-          <div className="sidebar-section-content">
-            <ArticlesList 
-              articles={popularArticles}
-              onArticleClick={onArticleClick}
-              selectedArticle={selectedArticle}
-            />
-          </div>
-        )}
+        <div className={`sidebar-section-content ${articlesMinimized ? 'minimized' : ''}`}>
+          <ArticlesList 
+            articles={popularArticles}
+            onArticleClick={onArticleClick}
+            selectedArticle={selectedArticle}
+          />
+        </div>
       </div>
 
       {/* Daily Digest Video Section */}
@@ -149,11 +145,9 @@ const Sidebar = ({
             {portfolioMinimized ? '□' : '−'}
           </button>
         </div>
-        {!portfolioMinimized && (
-          <div className="sidebar-section-content">
-            <PortfolioOverlay isWindow={true} />
-          </div>
-        )}
+        <div className={`sidebar-section-content ${portfolioMinimized ? 'minimized' : ''}`}>
+          <PortfolioOverlay isWindow={true} />
+        </div>
       </div>
 
       {/* Predictions Section */}
@@ -178,15 +172,13 @@ const Sidebar = ({
               {predictionMinimized ? '□' : '−'}
             </button>
           </div>
-          {!predictionMinimized && (
-            <div className="sidebar-section-content">
-              <PredictionResults 
-                predictions={predictions}
-                loading={predictionsLoading}
-                article={selectedArticle}
-              />
-            </div>
-          )}
+          <div className={`sidebar-section-content ${predictionMinimized ? 'minimized' : ''}`}>
+            <PredictionResults 
+              predictions={predictions}
+              loading={predictionsLoading}
+              article={selectedArticle}
+            />
+          </div>
         </div>
       )}
     </div>

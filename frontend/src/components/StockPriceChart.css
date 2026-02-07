@@ -14,6 +14,18 @@
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  animation: fadeInDown 0.5s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .chart-title {
@@ -49,6 +61,20 @@
   font-size: 18px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
+}
+
+.current-price.updating {
+  animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 .chart-svg {
@@ -56,6 +82,16 @@
   height: auto;
   width: 100%;
   margin: 0;
+  animation: fadeIn 0.8s ease-out 0.2s both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .chart-legend {

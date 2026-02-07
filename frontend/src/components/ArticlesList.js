@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import './ArticlesList.css';
 
 const ArticlesList = ({ articles, onArticleClick, selectedArticle }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [aiSearchResults, setAiSearchResults] = useState(null);
+  const articlesContainerRef = useRef(null);
+  const hasAnimatedRef = useRef(false);
 
   // Simple text-based search as fallback
   const filteredArticles = useMemo(() => {
@@ -62,6 +64,33 @@ const ArticlesList = ({ articles, onArticleClick, selectedArticle }) => {
 
   const displayArticles = aiSearchResults?.articles || filteredArticles;
 
+  // Animate articles appearing
+  useEffect(() => {
+    if (displayArticles.length === 0) return;
+    
+    // Reset animation when articles change
+    hasAnimatedRef.current = false;
+    const timer = setTimeout(() => {
+      const articleCards = articlesContainerRef.current?.querySelectorAll('.article-card');
+      if (articleCards && articleCards.length > 0) {
+        articleCards.forEach((card, index) => {
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(20px)';
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              card.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+              card.style.opacity = '1';
+              card.style.transform = 'translateY(0)';
+            }, index * 50);
+          });
+        });
+        hasAnimatedRef.current = true;
+      }
+    }, 50);
+    
+    return () => clearTimeout(timer);
+  }, [displayArticles.length, searchQuery]);
+
   return (
     <div className="articles-list">
       <div className="articles-search-container">
@@ -97,7 +126,7 @@ const ArticlesList = ({ articles, onArticleClick, selectedArticle }) => {
         )}
       </div>
 
-      <div className="articles-container">
+      <div ref={articlesContainerRef} className="articles-container">
         {displayArticles.length === 0 ? (
           <div className="empty-state">
             <p>

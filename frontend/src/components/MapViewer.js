@@ -309,23 +309,65 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
     const ne = bounds.getNorthEast();
     const sw = bounds.getSouthWest();
     
-    // Helper function to check if a coordinate is within visible bounds
+    // Helper function to check if a coordinate is actually visible on screen
     const isCoordinateVisible = (lat, lng) => {
-      // Check latitude bounds
-      if (lat < sw.lat || lat > ne.lat) {
-        return false;
-      }
-      
-      // Check longitude bounds (handle wrapping around date line)
-      const lngWest = sw.lng;
-      const lngEast = ne.lng;
-      
-      // Normal case: bounds don't wrap
-      if (lngWest <= lngEast) {
-        return lng >= lngWest && lng <= lngEast;
-      } else {
-        // Bounds wrap around date line (e.g., lngWest = 170, lngEast = -170)
-        return lng >= lngWest || lng <= lngEast;
+      try {
+        // Use map.project() to convert lat/lng to screen coordinates
+        // This accounts for rotation, pitch, and actual visibility
+        const point = map.project([lng, lat]);
+        
+        // Check if project() returned valid coordinates
+        if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
+          return false;
+        }
+        
+        // Get the map container dimensions
+        const container = map.getContainer();
+        const width = container.offsetWidth;
+        const height = container.offsetHeight;
+        
+        // Check if the point is within the visible viewport
+        // Use tighter padding to prevent markers on the back of the globe
+        const padding = 50;
+        const isInViewport = point.x >= -padding && 
+                            point.x <= width + padding && 
+                            point.y >= -padding && 
+                            point.y <= height + padding;
+        
+        // Also check bounds as a secondary check
+        // This helps catch edge cases where project() might return coordinates
+        // for points on the back of the globe that still project to screen space
+        const inLatBounds = lat >= sw.lat && lat <= ne.lat;
+        const lngWest = sw.lng;
+        const lngEast = ne.lng;
+        let inLngBounds;
+        if (lngWest <= lngEast) {
+          inLngBounds = lng >= lngWest && lng <= lngEast;
+        } else {
+          // Bounds wrap around date line
+          inLngBounds = lng >= lngWest || lng <= lngEast;
+        }
+        
+        // Point must be both in viewport AND in bounds
+        return isInViewport && inLatBounds && inLngBounds;
+      } catch (e) {
+        // Fallback to bounds check if project() fails
+        // Check latitude bounds
+        if (lat < sw.lat || lat > ne.lat) {
+          return false;
+        }
+        
+        // Check longitude bounds (handle wrapping around date line)
+        const lngWest = sw.lng;
+        const lngEast = ne.lng;
+        
+        // Normal case: bounds don't wrap
+        if (lngWest <= lngEast) {
+          return lng >= lngWest && lng <= lngEast;
+        } else {
+          // Bounds wrap around date line (e.g., lngWest = 170, lngEast = -170)
+          return lng >= lngWest || lng <= lngEast;
+        }
       }
     };
 
@@ -367,11 +409,12 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
     // Only show articles with coordinates
     const articlesWithCoords = filteredArticles.filter(a => a.coordinates?.lat && a.coordinates?.lng);
     
-    // Filter out markers that are on the opposite side of the globe (only when zoomed in)
-    // When zoomed out (zoom < 3), show all markers. When zoomed in, filter by bounds.
+    // Filter out markers that are on the opposite side of the globe
+    // Always filter by screen visibility when zoomed in enough
     let markersToCreate = articlesWithCoords;
-    if (currentZoom >= 3) {
-      // Filter by visible bounds when zoomed in
+    if (currentZoom >= 2.5) {
+      // Filter by actual screen visibility when zoomed in
+      // This prevents markers on the back of the globe from appearing
       markersToCreate = articlesWithCoords.filter(article => {
         const { lat, lng } = article.coordinates;
         return isCoordinateVisible(lat, lng);

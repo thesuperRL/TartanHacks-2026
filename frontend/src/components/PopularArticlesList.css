@@ -37,6 +37,11 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .article-card::before {
@@ -58,9 +63,14 @@
 
 .article-card:hover {
   background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(74, 158, 255, 0.2);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(74, 158, 255, 0.4), 0 0 0 1px rgba(74, 158, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+.article-card:active {
+  transform: translateY(-2px) scale(0.99);
+  transition: transform 0.1s ease-out;
 }
 
 .article-card.selected {
@@ -95,6 +105,43 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.category-badge::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+}
+
+.category-badge:hover::before {
+  width: 200px;
+  height: 200px;
+}
+
+.category-badge:hover {
+  transform: scale(1.15) translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  animation: badgeGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes badgeGlow {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
 }
 
 .category-badge.financial {

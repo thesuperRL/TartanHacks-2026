@@ -1,12 +1,38 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import './PopularArticlesList.css';
 
 const PopularArticlesList = ({ articles, onArticleClick, selectedArticle }) => {
+  const articlesContainerRef = useRef(null);
+
+  // Animate articles appearing
+  useEffect(() => {
+    if (articles.length === 0) return;
+    
+    const timer = setTimeout(() => {
+      const articleCards = articlesContainerRef.current?.querySelectorAll('.article-card');
+      if (articleCards && articleCards.length > 0) {
+        articleCards.forEach((card, index) => {
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(20px)';
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              card.style.transition = 'opacity 0.4s ease-out, transform 0.4s ease-out';
+              card.style.opacity = '1';
+              card.style.transform = 'translateY(0)';
+            }, index * 60);
+          });
+        });
+      }
+    }, 50);
+    
+    return () => clearTimeout(timer);
+  }, [articles.length]);
+
   return (
     <div className="popular-articles-list">
       <p className="subtitle">Click to reveal and explore on map</p>
       
-      <div className="articles-container">
+      <div ref={articlesContainerRef} className="articles-container">
         {articles.length === 0 ? (
           <div className="empty-state">
             <p>No articles available. Click "Refresh News" to load articles.</p>
