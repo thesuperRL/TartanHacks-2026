@@ -147,32 +147,38 @@ function App() {
       if (content) {
         // Remove hidden class first, then animate in
         content.classList.remove('hidden');
-        // Small delay to ensure smooth transition
+        // Use double requestAnimationFrame for smoother transition
         requestAnimationFrame(() => {
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             content.classList.add('animate-in');
-          }, 10);
+          });
         });
       }
 
       // If authenticated, animate authenticated elements
       if (isAuthenticated) {
-        setTimeout(() => {
-          const buttons = document.querySelectorAll('.refresh-button, .user-info');
-          buttons.forEach((btn, i) => {
-            setTimeout(() => {
-              btn.classList.add('animate-in');
-            }, i * 30);
-          });
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const buttons = document.querySelectorAll('.refresh-button, .user-info');
+            buttons.forEach((btn, i) => {
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  btn.classList.add('animate-in');
+                }, i * 20);
+              });
+            });
 
-          const sidebar = document.querySelector('.sidebar');
-          const mapContainer = document.querySelector('.map-container');
-          
-          setTimeout(() => {
-            if (sidebar) sidebar.classList.add('animate-in');
-            if (mapContainer) mapContainer.classList.add('animate-in');
-          }, 80);
-        }, 100);
+            const sidebar = document.querySelector('.sidebar');
+            const mapContainer = document.querySelector('.map-container');
+            
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                if (sidebar) sidebar.classList.add('animate-in');
+                if (mapContainer) mapContainer.classList.add('animate-in');
+              }, 50);
+            });
+          });
+        });
       }
     }
   }, [authLoading, isAuthenticated, logoAnimationComplete]);
@@ -181,9 +187,9 @@ function App() {
   useEffect(() => {
     if (prevAuthenticatedRef.current === false && isAuthenticated === true) {
       // User just logged in - use CSS classes for smooth animations
-      // Use requestAnimationFrame to ensure DOM is ready
+      // Use double requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           const header = document.querySelector('.app-header');
           const headerH1 = document.querySelector('.app-header h1');
           const content = document.querySelector('.app-content');
@@ -203,33 +209,39 @@ function App() {
           }
 
           // Animate buttons with slight delay
-          setTimeout(() => {
-            const buttons = document.querySelectorAll('.refresh-button, .user-info');
-            buttons.forEach((btn, i) => {
-              setTimeout(() => {
-                btn.classList.add('animate-in');
-              }, i * 30);
-            });
-          }, 50);
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const buttons = document.querySelectorAll('.refresh-button, .user-info');
+              buttons.forEach((btn, i) => {
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    btn.classList.add('animate-in');
+                  }, i * 20);
+                });
+              });
+            }, 30);
+          });
 
-          // Animate sidebar and map - wait a bit for them to render
-          setTimeout(() => {
-            const sidebar = document.querySelector('.sidebar');
-            const mapContainer = document.querySelector('.map-container');
-            
-            if (sidebar) sidebar.classList.add('animate-in');
-            if (mapContainer) {
-              setTimeout(() => {
-                mapContainer.classList.add('animate-in');
-              }, 50);
-            }
-          }, 150);
+          // Animate sidebar and map
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const sidebar = document.querySelector('.sidebar');
+              const mapContainer = document.querySelector('.map-container');
+              
+              if (sidebar) sidebar.classList.add('animate-in');
+              if (mapContainer) {
+                requestAnimationFrame(() => {
+                  mapContainer.classList.add('animate-in');
+                });
+              }
+            }, 50);
+          });
           
           // Remove blur with CSS transition
           if (content) {
             content.classList.remove('blurred');
           }
-        }, 100);
+        });
       });
     }
     prevAuthenticatedRef.current = isAuthenticated;

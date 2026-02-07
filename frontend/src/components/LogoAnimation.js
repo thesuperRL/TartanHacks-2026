@@ -1,92 +1,107 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { animate } from 'animejs';
 import './LogoAnimation.css';
 
 const LogoAnimation = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isHidden, setIsHidden] = useState(false);
+  const logoIconRef = useRef(null);
+  const logoTextRef = useRef(null);
+  const logoSplashRef = useRef(null);
+  const logoContainerRef = useRef(null);
+  const hasAnimatedRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep onComplete ref updated without causing re-renders
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
-    const logoIcon = document.querySelector('.logo-icon');
-    const logoText = document.querySelector('.logo-text');
-    const logoSplash = document.querySelector('.logo-splash');
-    const logoContainer = document.querySelector('.logo-splash-container');
+    // Prevent animation from running multiple times
+    if (hasAnimatedRef.current) return;
+    
+    // Use requestAnimationFrame to ensure DOM is ready and avoid layout thrashing
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const logoIcon = logoIconRef.current;
+        const logoText = logoTextRef.current;
+        const logoSplash = logoSplashRef.current;
+        const logoContainer = logoContainerRef.current;
 
-    if (!logoContainer || !logoSplash) return;
+        if (!logoContainer || !logoSplash || !logoIcon || !logoText) return;
+        
+        // Mark as animated immediately to prevent re-runs
+        hasAnimatedRef.current = true;
 
-    // Sequence of animations using setTimeout for reliable timing
-    const animationSequence = () => {
-      // 1. Logo appears with scale and rotation (600ms - even faster)
-      animate(logoIcon, {
-        scale: [0, 1],
-        rotate: [0, 360],
-        opacity: [0, 1],
-        duration: 600,
-        easing: 'easeOutElastic(1, .6)'
-      });
+        // Sequence of animations with optimized timing
+        const animationSequence = () => {
+          // 1. Logo appears with scale and rotation (use cubic easing instead of elastic for better performance)
+          animate(logoIcon, {
+            scale: [0, 1],
+            rotate: [0, 360],
+            opacity: [0, 1],
+            duration: 500,
+            easing: 'easeOutCubic'
+          });
 
-      // 2. Logo text fades in after icon starts (50ms delay + 400ms duration - faster)
-      setTimeout(() => {
-        animate(logoText, {
-          opacity: [0, 1],
-          translateY: [20, 0],
-          duration: 400,
-          easing: 'easeOutCubic'
-        });
-      }, 150);
-
-      // 3. Brief pause (150ms - much faster) + wait for previous animations
-      // Total wait: 600ms (icon) + 150ms (pause) = 750ms
-      setTimeout(() => {
-        // 4. Logo content zooms out (animate the splash, not the container) - faster
-        animate(logoSplash, {
-          scale: [1, 0],
-          opacity: [1, 0],
-          duration: 400,
-          easing: 'easeInCubic'
-        });
-
-        // 5. Container background fades out separately (faster fade)
-        animate(logoContainer, {
-          opacity: [1, 0],
-          duration: 300,
-          easing: 'easeInCubic',
-          delay: 100
-        });
-
-        // 6. Start main content animation before logo fully disappears (overlap for smooth transition)
-        // Start main content at 200ms (before logo fully fades at 400ms)
-        setTimeout(() => {
-          // Trigger the callback to start main content animation
-          if (onComplete) {
-            onComplete();
-          }
-        }, 200);
-
-        // 7. Wait for container to fully fade out, then hide
-        // Total fade time: 100ms delay + 300ms duration = 400ms
-        setTimeout(() => {
-          // Mark as hidden (keeps in DOM to prevent layout shift)
-          setIsHidden(true);
-          
-          // Remove from DOM after main content has had time to appear
+          // 2. Logo text fades in after icon starts
           setTimeout(() => {
-            setIsVisible(false);
-          }, 300);
-        }, 400);
-      }, 750);
-    };
+            animate(logoText, {
+              opacity: [0, 1],
+              translateY: [20, 0],
+              duration: 350,
+              easing: 'easeOutCubic'
+            });
+          }, 100);
 
-    // Small delay to ensure DOM is ready
-    setTimeout(animationSequence, 100);
-  }, [onComplete]);
+          // 3. Wait for animations to complete before starting fade out
+          setTimeout(() => {
+            // 4. Logo content zooms out
+            animate(logoSplash, {
+              scale: [1, 0],
+              opacity: [1, 0],
+              duration: 350,
+              easing: 'easeInCubic'
+            });
+
+            // 5. Container background fades out
+            animate(logoContainer, {
+              opacity: [1, 0],
+              duration: 300,
+              easing: 'easeInCubic',
+              delay: 50
+            });
+
+            // 6. Start main content animation before logo fully disappears
+            setTimeout(() => {
+              if (onCompleteRef.current) {
+                onCompleteRef.current();
+              }
+            }, 150);
+
+            // 7. Wait for container to fade out, then hide
+            setTimeout(() => {
+              setIsHidden(true);
+              setTimeout(() => {
+                setIsVisible(false);
+              }, 200);
+            }, 350);
+          }, 600);
+        };
+
+        // Start animation sequence
+        animationSequence();
+      });
+    });
+  }, []); // Empty dependency array - animation runs only once on mount
 
   if (!isVisible) return null;
 
   return (
-    <div className={`logo-splash-container ${isHidden ? 'logo-hidden' : ''}`}>
-      <div className="logo-splash">
-        <div className="logo-icon">
+    <div ref={logoContainerRef} className={`logo-splash-container ${isHidden ? 'logo-hidden' : ''}`}>
+      <div ref={logoSplashRef} className="logo-splash">
+        <div ref={logoIconRef} className="logo-icon">
           <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
             {/* Globe icon */}
             <circle cx="50" cy="50" r="45" stroke="url(#gradient1)" strokeWidth="3" fill="none"/>
@@ -107,7 +122,7 @@ const LogoAnimation = ({ onComplete }) => {
             </defs>
           </svg>
         </div>
-        <div className="logo-text">Global News Explorer</div>
+        <div ref={logoTextRef} className="logo-text">Global News Explorer</div>
       </div>
     </div>
   );

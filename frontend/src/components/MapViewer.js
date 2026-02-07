@@ -16,6 +16,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
   const markersRef = useRef([]);
   const popupsRef = useRef([]);
   const [currentZoom, setCurrentZoom] = useState(2);
+  const [mapBounds, setMapBounds] = useState(null);
   const [demoArticles] = useState(() => generateDemoArticles());
 
   // Modal states
@@ -77,15 +78,22 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
 
       mapRef.current = mapInstance;
 
-      // Track zoom level
-      mapInstance.on('zoom', () => {
+      // Track zoom level and map movement to update markers
+      const updateMapState = () => {
         setCurrentZoom(mapInstance.getZoom());
-      });
+        setMapBounds(mapInstance.getBounds());
+      };
+      
+      mapInstance.on('zoom', updateMapState);
+      mapInstance.on('move', updateMapState);
+      mapInstance.on('rotate', updateMapState);
+      mapInstance.on('pitch', updateMapState);
 
       mapInstance.on('load', () => {
         console.log('Map loaded, applying custom theme...');
         setMapLoaded(true);
         setCurrentZoom(mapInstance.getZoom());
+        setMapBounds(mapInstance.getBounds());
 
         // Apply dark theme colors
         try {
@@ -296,6 +304,31 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
     popupsRef.current.forEach(popup => popup.remove());
     popupsRef.current = [];
 
+    // Get current map bounds to filter markers on opposite side of globe
+    const bounds = mapBounds || map.getBounds();
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    
+    // Helper function to check if a coordinate is within visible bounds
+    const isCoordinateVisible = (lat, lng) => {
+      // Check latitude bounds
+      if (lat < sw.lat || lat > ne.lat) {
+        return false;
+      }
+      
+      // Check longitude bounds (handle wrapping around date line)
+      const lngWest = sw.lng;
+      const lngEast = ne.lng;
+      
+      // Normal case: bounds don't wrap
+      if (lngWest <= lngEast) {
+        return lng >= lngWest && lng <= lngEast;
+      } else {
+        // Bounds wrap around date line (e.g., lngWest = 170, lngEast = -170)
+        return lng >= lngWest || lng <= lngEast;
+      }
+    };
+
     // Filter articles with gradual zoom-based visibility
     // Use demo articles if no articles provided, otherwise use provided articles
     const allArticles = articles.length > 0 ? articles : demoArticles;
@@ -334,9 +367,16 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
     // Only show articles with coordinates
     const articlesWithCoords = filteredArticles.filter(a => a.coordinates?.lat && a.coordinates?.lng);
     
-    // If zoomed out (zoom < 2.5), limit to a sample of global articles for performance
+    // Filter out markers that are on the opposite side of the globe (only when zoomed in)
+    // When zoomed out (zoom < 3), show all markers. When zoomed in, filter by bounds.
     let markersToCreate = articlesWithCoords;
-    if (currentZoom < 2.5) {
+    if (currentZoom >= 3) {
+      // Filter by visible bounds when zoomed in
+      markersToCreate = articlesWithCoords.filter(article => {
+        const { lat, lng } = article.coordinates;
+        return isCoordinateVisible(lat, lng);
+      });
+    } else if (currentZoom < 2.5) {
       // Show only a sample of global articles when zoomed out
       markersToCreate = articlesWithCoords
         .filter(a => (a.minZoom === 0 || a.minZoom === undefined) && (a.maxZoom === undefined || a.maxZoom > 2.5))
@@ -549,7 +589,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       popupsRef.current.push(popup);
     });
 
-  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, demoArticles]);
+  }, [mapbox, mapLoaded, articles, selectedArticle, onArticleSelect, currentZoom, mapBounds, demoArticles, stocks, portfolio]);
 
   return (
     <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>

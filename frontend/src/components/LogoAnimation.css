@@ -13,6 +13,12 @@
   transform-origin: center center;
   pointer-events: none;
   transition: opacity 0.3s ease-out;
+  will-change: opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  opacity: 1;
 }
 
 .logo-splash-container.logo-hidden {
@@ -29,6 +35,8 @@
   gap: 30px;
   transform-origin: center center;
   will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .logo-icon {
@@ -38,7 +46,12 @@
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transform: scale(0);
+  transform: scale(0) translateZ(0);
+  transform-origin: center center;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
 }
 
 .logo-icon svg {
@@ -58,6 +71,9 @@
   letter-spacing: -0.5px;
   text-shadow: 0 0 30px rgba(74, 158, 255, 0.3);
   opacity: 0;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* Animation for the expanding effect */
