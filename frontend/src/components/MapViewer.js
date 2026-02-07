@@ -1060,11 +1060,13 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
       )}
       <div ref={mapContainerRef} className="mapbox-map-container" style={{ width:'100%',height:'100%',minHeight:'400px',position:'absolute',top:0,left:0,zIndex:1 }} />
 
-      {/* Panel Toggle */}
-      <MapPanelToggle 
-        activePanel={activePanel} 
-        onPanelChange={handlePanelChange}
-      />
+      {/* Panel Toggle - Only show in economic mode */}
+      {mode !== 'political' && (
+        <MapPanelToggle 
+          activePanel={activePanel} 
+          onPanelChange={handlePanelChange}
+        />
+      )}
 
       {/* Loading indicator for companies */}
       {activePanel === 'companies' && companiesLoading && (

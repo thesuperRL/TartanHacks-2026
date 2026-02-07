@@ -1896,17 +1896,13 @@ def generate_knowledge_graph():
             article_text = f"Article from {article_url}"
         
         # Use OpenAI to analyze the article and generate knowledge graph data
-        try:
-            from openai import OpenAI
-            import os
-            
-            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-            
-            stocks_str = ', '.join(portfolio_stocks) if portfolio_stocks else 'None'
-            
-            if not portfolio_stocks:
-                # If no stocks, still analyze but note it
-                prompt = f"""Analyze this article and create a knowledge graph structure.
+        # Build prompt first so it's available for fallback
+        stocks_str = ', '.join(portfolio_stocks) if portfolio_stocks else 'None'
+        prompt = None
+        
+        if not portfolio_stocks:
+            # If no stocks, still analyze but note it
+            prompt = f"""Analyze this article and create a knowledge graph structure.
 
 Article Title: {title_text}
 Article Content: {article_text[:3000]}
@@ -1926,10 +1922,12 @@ Return ONLY valid JSON in this exact format:
     "events": ["event 1", "event 2", "event 3"],
     "impacts": [],
     "reasoning": ["reason 1", "reason 2"]
-}}"""
-            else:
-                # Always generate impacts for each stock in portfolio
-                prompt = f"""Analyze this article and create a knowledge graph structure. You MUST analyze how this article impacts EACH stock in the user's portfolio, even if the connection is indirect.
+}}
+
+CRITICAL: Your response MUST be complete, valid JSON. Do not truncate your response."""
+        else:
+            # Always generate impacts for each stock in portfolio
+            prompt = f"""Analyze this article and create a knowledge graph structure. You MUST analyze how this article impacts EACH stock in the user's portfolio, even if the connection is indirect.
 
 Article Title: {title_text}
 Article Content: {article_text[:3000]}
@@ -1974,26 +1972,151 @@ Return ONLY valid JSON in this exact format:
     "reasoning": ["reason 1", "reason 2"]
 }}
 
-CRITICAL: You MUST include an impact entry for EVERY stock in the portfolio: {', '.join(portfolio_stocks)}. Do not leave any stock out. If the connection is indirect, explain the indirect relationship clearly."""
+CRITICAL: 
+1. You MUST include an impact entry for EVERY stock in the portfolio: {', '.join(portfolio_stocks)}. Do not leave any stock out. If the connection is indirect, explain the indirect relationship clearly.
+2. Your response MUST be complete, valid JSON. Do not truncate your response. Ensure all JSON brackets and braces are properly closed."""
+        
+        # Now try OpenAI API
+        try:
+            from openai import OpenAI
+            import os
             
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a financial analyst. Always return valid JSON only, no markdown. You MUST analyze impacts for every stock in the user's portfolio, even if the connection is indirect."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=2000  # Increased to accommodate detailed impacts for each stock
-            )
+            openai_api_key = os.getenv('OPENAI_API_KEY')
+            if not openai_api_key:
+                raise Exception("OPENAI_API_KEY environment variable is not set. Please set it in your .env file.")
             
-            result_text = response.choices[0].message.content.strip()
-            # Remove markdown code blocks if present
-            if result_text.startswith('```'):
-                result_text = result_text.split('```')[1]
-                if result_text.startswith('json'):
-                    result_text = result_text[4:]
+            client = OpenAI(api_key=openai_api_key)
+            print(f"Using OpenAI API for knowledge graph generation")
             
-            result = json.loads(result_text)
+            # Calculate appropriate max_tokens based on number of stocks
+            # Base tokens: 1000 for article analysis + 500 per stock for detailed impact analysis
+            num_stocks = len(portfolio_stocks) if portfolio_stocks else 0
+            base_tokens = 2000
+            stock_tokens = max(800 * num_stocks, 2000)  # At least 800 tokens per stock, minimum 2000
+            max_tokens = min(base_tokens + stock_tokens, 8000)  # Cap at 8000 to avoid hitting limits
+            
+            print(f"Generating knowledge graph with max_tokens={max_tokens} for {num_stocks} stocks")
+            
+            # Retry logic for incomplete responses
+            max_retries = 2
+            result = None
+            last_error = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "You are a financial analyst. Always return valid JSON only, no markdown. You MUST analyze impacts for every stock in the user's portfolio, even if the connection is indirect. CRITICAL: Your response MUST be complete, valid JSON. Do not truncate your response."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3,
+                        max_tokens=max_tokens
+                    )
+                    
+                    # Check response structure
+                    if not response or not response.choices or len(response.choices) == 0:
+                        raise Exception("Empty response from OpenAI API")
+                    
+                    result_text = response.choices[0].message.content.strip()
+                    
+                    if not result_text:
+                        raise Exception("Empty content in OpenAI response")
+                    
+                    # Check if response was truncated
+                    finish_reason = getattr(response.choices[0], 'finish_reason', None)
+                    if finish_reason == 'length':
+                        print(f"Warning: Response was truncated (finish_reason=length). Attempt {attempt + 1}/{max_retries + 1}")
+                        if attempt < max_retries:
+                            # Increase tokens and retry
+                            max_tokens = min(max_tokens + 2000, 8000)
+                            continue
+                        else:
+                            print(f"Warning: Response truncated on final attempt. Attempting to parse partial JSON...")
+                    
+                    # Remove markdown code blocks if present
+                    if result_text.startswith('```'):
+                        result_text = result_text.split('```')[1]
+                        if result_text.startswith('json'):
+                            result_text = result_text[4:]
+                        result_text = result_text.strip()
+                    
+                    # Try to parse JSON
+                    try:
+                        result = json.loads(result_text)
+                    except json.JSONDecodeError as json_err:
+                        # Try to fix incomplete JSON
+                        print(f"JSON parse error: {json_err}. Attempting to fix incomplete JSON...")
+                        
+                        # Try to extract valid JSON from incomplete response
+                        # Look for the last complete object/array
+                        if result_text.rstrip().endswith(','):
+                            result_text = result_text.rstrip()[:-1]
+                        
+                        # Try to close unclosed brackets/braces
+                        open_braces = result_text.count('{') - result_text.count('}')
+                        open_brackets = result_text.count('[') - result_text.count(']')
+                        
+                        if open_braces > 0:
+                            result_text += '}' * open_braces
+                        if open_brackets > 0:
+                            result_text += ']' * open_brackets
+                        
+                        # Try parsing again
+                        try:
+                            result = json.loads(result_text)
+                        except json.JSONDecodeError:
+                            # If still fails and we have retries left, retry with more tokens
+                            if attempt < max_retries:
+                                max_tokens = min(max_tokens + 2000, 8000)
+                                last_error = f"JSON parsing failed: {json_err}"
+                                continue
+                            else:
+                                raise Exception(f"Failed to parse JSON response after {max_retries + 1} attempts. Last error: {json_err}")
+                    
+                    # Validate that we have the required structure
+                    if not isinstance(result, dict):
+                        raise Exception("Response is not a JSON object")
+                    
+                    # Ensure all required fields exist
+                    if 'article' not in result:
+                        result['article'] = {'title': title_text, 'summary': ''}
+                    if 'events' not in result:
+                        result['events'] = []
+                    if 'impacts' not in result:
+                        result['impacts'] = []
+                    if 'reasoning' not in result:
+                        result['reasoning'] = []
+                    
+                    # Validate impacts if stocks were provided
+                    if portfolio_stocks and len(result.get('impacts', [])) < len(portfolio_stocks):
+                        print(f"Warning: Only {len(result.get('impacts', []))} impacts provided for {len(portfolio_stocks)} stocks")
+                        # If we have retries left and impacts are missing, retry
+                        if attempt < max_retries:
+                            max_tokens = min(max_tokens + 2000, 8000)
+                            last_error = f"Missing impacts for some stocks. Expected {len(portfolio_stocks)}, got {len(result.get('impacts', []))}"
+                            continue
+                    
+                    # Success! Break out of retry loop
+                    break
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    import traceback
+                    error_trace = traceback.format_exc()
+                    print(f"Error on attempt {attempt + 1}/{max_retries + 1}: {e}")
+                    print(f"Traceback: {error_trace}")
+                    
+                    if attempt < max_retries:
+                        print(f"Retrying with more tokens (current: {max_tokens})...")
+                        max_tokens = min(max_tokens + 2000, 8000)
+                        continue
+                    else:
+                        # On final attempt, raise with full error details
+                        raise Exception(f"Failed after {max_retries + 1} attempts. Last error: {last_error}")
+            
+            if result is None:
+                raise Exception(f"Failed to generate valid response after {max_retries + 1} attempts: {last_error}")
             
             return jsonify({
                 'status': 'success',
@@ -2004,18 +2127,74 @@ CRITICAL: You MUST include an impact entry for EVERY stock in the portfolio: {',
             }), 200
             
         except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
             print(f"Error with OpenAI analysis: {e}")
-            # Fallback: generate basic structure
+            print(f"Full traceback: {error_trace}")
+            
+            # Try OpenRouter as fallback if OpenAI fails
+            try:
+                from openrouter_client import OpenRouterClient
+                openrouter_key = os.getenv('OPENROUTER_API_KEY')
+                if openrouter_key and prompt:
+                    print("Attempting to use OpenRouter as fallback...")
+                    openrouter_client = OpenRouterClient(api_key=openrouter_key)
+                    
+                    # Recalculate tokens for OpenRouter
+                    num_stocks = len(portfolio_stocks) if portfolio_stocks else 0
+                    base_tokens = 2000
+                    stock_tokens = max(800 * num_stocks, 2000)
+                    max_tokens = min(base_tokens + stock_tokens, 8000)
+                    
+                    # Use the same prompt
+                    response = openrouter_client.chat_completions_create(
+                        model="deepseek/deepseek-r1-0528:free",
+                        messages=[
+                            {"role": "system", "content": "You are a financial analyst. Always return valid JSON only, no markdown. You MUST analyze impacts for every stock in the user's portfolio, even if the connection is indirect. CRITICAL: Your response MUST be complete, valid JSON. Do not truncate your response."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3,
+                        max_tokens=max_tokens
+                    )
+                    
+                    result_text = response.choices[0].message.content.strip()
+                    
+                    # Remove markdown code blocks if present
+                    if result_text.startswith('```'):
+                        result_text = result_text.split('```')[1]
+                        if result_text.startswith('json'):
+                            result_text = result_text[4:]
+                        result_text = result_text.strip()
+                    
+                    result = json.loads(result_text)
+                    
+                    # Ensure all required fields exist
+                    if 'article' not in result:
+                        result['article'] = {'title': title_text, 'summary': ''}
+                    if 'events' not in result:
+                        result['events'] = []
+                    if 'impacts' not in result:
+                        result['impacts'] = []
+                    if 'reasoning' not in result:
+                        result['reasoning'] = []
+                    
+                    print("Successfully generated knowledge graph using OpenRouter fallback")
+                    return jsonify({
+                        'status': 'success',
+                        'article': result.get('article', {'title': title_text, 'summary': ''}),
+                        'events': result.get('events', []),
+                        'impacts': result.get('impacts', []),
+                        'reasoning': result.get('reasoning', [])
+                    }), 200
+            except Exception as openrouter_error:
+                print(f"OpenRouter fallback also failed: {openrouter_error}")
+            
+            # Return error so user knows what went wrong
             return jsonify({
-                'status': 'success',
-                'article': {
-                    'title': title_text,
-                    'summary': article_text[:200] + '...' if len(article_text) > 200 else article_text
-                },
-                'events': ['Article analyzed', 'Content extracted'],
-                'impacts': [],
-                'reasoning': ['Article analysis completed']
-            }), 200
+                'status': 'error',
+                'message': f'Failed to generate knowledge graph: {str(e)}. Please check that OPENAI_API_KEY or OPENROUTER_API_KEY is set and valid.',
+                'error_details': str(e)
+            }), 500
         
     except Exception as e:
         print(f"Error generating knowledge graph: {e}")
