@@ -39,4 +39,5 @@ Thumbs.db
 
 # Application specific
 backend/articles_data.json
+backend/portfolios.json
 frontend/build/
