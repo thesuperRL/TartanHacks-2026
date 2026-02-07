@@ -65,18 +65,22 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
             // Reset loaded state
             setStreetViewLoaded(false);
             
-            // Set position and make visible
+            // Set position FIRST, then make visible after a brief delay
             streetView.setPosition(panoramaLocation);
             streetView.setPov({ heading: 270, pitch: 0 });
-            streetView.setVisible(true);
-            setIsStreetView(true);
             
-            // Trigger resize
+            // Small delay to ensure position is set before making visible
             setTimeout(() => {
-              if (window.google && window.google.maps && window.google.maps.event) {
-                window.google.maps.event.trigger(streetView, 'resize');
-              }
-            }, 300);
+              streetView.setVisible(true);
+              setIsStreetView(true);
+              
+              // Trigger resize
+              setTimeout(() => {
+                if (window.google && window.google.maps && window.google.maps.event) {
+                  window.google.maps.event.trigger(streetView, 'resize');
+                }
+              }, 300);
+            }, 50);
           } else {
             console.log('Street view not available at this location:', status);
             alert('Street View imagery is not available at this location. Try clicking on a road or street.');
@@ -154,10 +158,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
         console.log('Street view container dimensions:', parentWidth, 'x', parentHeight);
       }
       
-      // Initialize street view
+      // Initialize street view with no initial position (will be set when activated)
       const streetViewInstance = new googleMaps.StreetViewPanorama(streetViewRef.current, {
-        position: { lat: 40.7128, lng: -74.0060 },
-        pov: { heading: 0, pitch: 0 },
         visible: false,
         enableCloseButton: false, // We'll handle exit with our own button
         addressControl: false,
@@ -226,19 +228,41 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           // Reset loaded state when entering new street view
           setStreetViewLoaded(false);
           
-          // Set position and make visible
+          // Set position FIRST, then make visible after a brief delay to ensure position is set
           streetViewInstance.setPosition(panoramaLocation);
           streetViewInstance.setPov({ heading: 270, pitch: 0 });
-          streetViewInstance.setVisible(true);
-          setIsStreetView(true);
           
-          // Wait a bit then trigger resize to ensure street view renders
+          // Small delay to ensure position is set before making visible
           setTimeout(() => {
-            if (window.google && window.google.maps && window.google.maps.event) {
-              window.google.maps.event.trigger(streetViewInstance, 'resize');
-              console.log('Street view resize triggered after activation');
-            }
-          }, 300);
+            streetViewInstance.setVisible(true);
+            setIsStreetView(true);
+            
+            // Also check loaded state after making visible (fallback)
+            setTimeout(() => {
+              if (isMounted) {
+                const panoId = streetViewInstance.getPano();
+                const status = streetViewInstance.getStatus();
+                const isVisible = streetViewInstance.getVisible();
+                console.log('Fallback check after activation:', { panoId, status, isVisible });
+                if (panoId && status === 'OK' && isVisible) {
+                  setTimeout(() => {
+                    if (isMounted && streetViewInstance.getVisible() && streetViewInstance.getPano()) {
+                      console.log('Setting street view as loaded (fallback)');
+                      setStreetViewLoaded(true);
+                    }
+                  }, 1500);
+                }
+              }
+            }, 500);
+            
+            // Wait a bit then trigger resize to ensure street view renders
+            setTimeout(() => {
+              if (window.google && window.google.maps && window.google.maps.event) {
+                window.google.maps.event.trigger(streetViewInstance, 'resize');
+                console.log('Street view resize triggered after activation');
+              }
+            }, 300);
+          }, 50);
         } else {
           console.log('Street view not available at this location:', status);
           alert('Street View imagery is not available at this location. Try clicking on a road or street.');
@@ -247,92 +271,144 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
     });
     
     // Listen for street view errors
-    streetViewInstance.addListener('error', (error) => {
-      console.error('Street view error:', error);
-      if (error === 'ZERO_RESULTS' || error === 'NOT_FOUND') {
-        alert('Street View imagery is not available at this location.');
-        streetViewInstance.setVisible(false);
-        setIsStreetView(false);
-      } else if (error === 'UNKNOWN_ERROR') {
-        console.warn('Street view unknown error - may be rate limiting (429)');
-        // Show a message but don't auto-exit - user can manually exit
-        // The loading overlay will show the issue
+    const errorListener = streetViewInstance.addListener('error', (error) => {
+      try {
+        console.error('Street view error:', error);
+        if (error === 'ZERO_RESULTS' || error === 'NOT_FOUND') {
+          if (isMounted) {
+            alert('Street View imagery is not available at this location.');
+            streetViewInstance.setVisible(false);
+            setIsStreetView(false);
+          }
+        } else if (error === 'UNKNOWN_ERROR') {
+          console.warn('Street view unknown error - may be rate limiting (429)');
+          // Show a message but don't auto-exit - user can manually exit
+          // The loading overlay will show the issue
+        }
+      } catch (err) {
+        console.error('Error in error listener:', err);
       }
     });
     
-    // Listen for when street view is ready
-    streetViewInstance.addListener('pano_changed', () => {
-      const panoId = streetViewInstance.getPano();
-      console.log('Street view panorama changed, pano ID:', panoId);
-      // Mark as loaded when we have a valid panorama
-      if (panoId) {
-        // Check if tiles are actually loaded by checking the status
+    // Track if component is mounted to avoid setState after unmount
+    let isMounted = true;
+    
+    // Helper function to check and set loaded state
+    const checkAndSetLoaded = () => {
+      if (!isMounted) return;
+      try {
+        const panoId = streetViewInstance.getPano();
         const status = streetViewInstance.getStatus();
-        if (status === 'OK') {
-          // Give it a shorter moment for tiles to actually render
+        const isVisible = streetViewInstance.getVisible();
+        
+        console.log('Checking street view loaded state:', { panoId, status, isVisible });
+        
+        if (panoId && status === 'OK' && isVisible) {
+          // Give it a moment for tiles to actually render
           setTimeout(() => {
-            console.log('Setting street view as loaded');
-            setStreetViewLoaded(true);
-          }, 500);
+            if (isMounted && streetViewInstance.getVisible() && streetViewInstance.getPano()) {
+              console.log('Setting street view as loaded');
+              setStreetViewLoaded(true);
+            }
+          }, 1500);
         }
+      } catch (error) {
+        console.error('Error checking loaded state:', error);
+      }
+    };
+    
+    // Listen for when street view is ready
+    const panoChangedListener = streetViewInstance.addListener('pano_changed', () => {
+      try {
+        const panoId = streetViewInstance.getPano();
+        console.log('Street view panorama changed, pano ID:', panoId);
+        checkAndSetLoaded();
+      } catch (error) {
+        console.error('Error in pano_changed listener:', error);
       }
     });
     
     // Listen for when street view tiles have loaded
-    streetViewInstance.addListener('status_changed', () => {
-      const status = streetViewInstance.getStatus();
-      console.log('Street view status changed:', status);
-      if (status === 'OK') {
-        const panoId = streetViewInstance.getPano();
-        if (panoId) {
-          // Give it a moment for tiles to actually render
-          setTimeout(() => {
-            console.log('Setting street view as loaded from status change');
-            setStreetViewLoaded(true);
-          }, 500);
-        }
+    const statusChangedListener = streetViewInstance.addListener('status_changed', () => {
+      try {
+        const status = streetViewInstance.getStatus();
+        console.log('Street view status changed:', status);
+        checkAndSetLoaded();
+      } catch (error) {
+        console.error('Error in status_changed listener:', error);
+      }
+    });
+    
+    // Also listen for position changes
+    const positionChangedListener = streetViewInstance.addListener('position_changed', () => {
+      try {
+        console.log('Street view position changed');
+        checkAndSetLoaded();
+      } catch (error) {
+        console.error('Error in position_changed listener:', error);
       }
     });
     
     // Listen for street view visibility changes
-    streetViewInstance.addListener('visible_changed', () => {
-      const isVisible = streetViewInstance.getVisible();
-      console.log('Street view visibility changed:', isVisible);
-      setIsStreetView(isVisible);
-      if (!isVisible) {
-        setStreetViewLoaded(false); // Reset when hidden
-      }
-      if (streetViewRef.current) {
-        if (isVisible) {
-          streetViewRef.current.style.display = 'block';
-          streetViewRef.current.style.visibility = 'visible';
-          streetViewRef.current.style.zIndex = '10';
-          // Ensure container has proper dimensions
-          const parent = streetViewRef.current.parentElement;
-          if (parent) {
-            const parentWidth = parent.offsetWidth || parent.clientWidth;
-            const parentHeight = parent.offsetHeight || parent.clientHeight;
-            streetViewRef.current.style.width = `${parentWidth}px`;
-            streetViewRef.current.style.height = `${parentHeight}px`;
-          }
-          // Trigger resize after visibility change
-          setTimeout(() => {
-            if (window.google && window.google.maps && window.google.maps.event) {
-              window.google.maps.event.trigger(streetViewInstance, 'resize');
-            }
-          }, 100);
-        } else {
-          streetViewRef.current.style.display = 'none';
-          streetViewRef.current.style.visibility = 'hidden';
-          streetViewRef.current.style.zIndex = '-1';
+    const visibleChangedListener = streetViewInstance.addListener('visible_changed', () => {
+      try {
+        if (!isMounted) return;
+        const isVisible = streetViewInstance.getVisible();
+        console.log('Street view visibility changed:', isVisible);
+        setIsStreetView(isVisible);
+        if (!isVisible) {
+          setStreetViewLoaded(false); // Reset when hidden
         }
+        if (streetViewRef.current) {
+          if (isVisible) {
+            streetViewRef.current.style.display = 'block';
+            streetViewRef.current.style.visibility = 'visible';
+            streetViewRef.current.style.zIndex = '10';
+            // Ensure container has proper dimensions
+            const parent = streetViewRef.current.parentElement;
+            if (parent) {
+              const parentWidth = parent.offsetWidth || parent.clientWidth;
+              const parentHeight = parent.offsetHeight || parent.clientHeight;
+              streetViewRef.current.style.width = `${parentWidth}px`;
+              streetViewRef.current.style.height = `${parentHeight}px`;
+            }
+            // Trigger resize after visibility change
+            setTimeout(() => {
+              if (window.google && window.google.maps && window.google.maps.event && isMounted) {
+                window.google.maps.event.trigger(streetViewInstance, 'resize');
+              }
+            }, 100);
+          } else {
+            streetViewRef.current.style.display = 'none';
+            streetViewRef.current.style.visibility = 'hidden';
+            streetViewRef.current.style.zIndex = '-1';
+          }
+        }
+      } catch (err) {
+        console.error('Error in visible_changed listener:', err);
       }
     });
 
       return () => {
+        isMounted = false;
         window.removeEventListener('resize', resizeHandler);
         if (dblclickListener) {
           googleMaps.event.removeListener(dblclickListener);
+        }
+        if (panoChangedListener) {
+          googleMaps.event.removeListener(panoChangedListener);
+        }
+        if (statusChangedListener) {
+          googleMaps.event.removeListener(statusChangedListener);
+        }
+        if (positionChangedListener) {
+          googleMaps.event.removeListener(positionChangedListener);
+        }
+        if (errorListener) {
+          googleMaps.event.removeListener(errorListener);
+        }
+        if (visibleChangedListener) {
+          googleMaps.event.removeListener(visibleChangedListener);
         }
       };
     } catch (error) {
@@ -434,19 +510,23 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
                   // Reset loaded state
                   setStreetViewLoaded(false);
                   
-                  // Set position and make visible
+                  // Set position FIRST, then make visible after a brief delay
                   streetView.setPosition(panoramaLocation);
                   streetView.setPov({ heading: 270, pitch: 0 });
-                  streetView.setVisible(true);
-                  setIsStreetView(true);
-                  infoWindow.close();
                   
-                  // Trigger resize
+                  // Small delay to ensure position is set before making visible
                   setTimeout(() => {
-                    if (window.google && window.google.maps && window.google.maps.event) {
-                      window.google.maps.event.trigger(streetView, 'resize');
-                    }
-                  }, 300);
+                    streetView.setVisible(true);
+                    setIsStreetView(true);
+                    infoWindow.close();
+                    
+                    // Trigger resize
+                    setTimeout(() => {
+                      if (window.google && window.google.maps && window.google.maps.event) {
+                        window.google.maps.event.trigger(streetView, 'resize');
+                      }
+                    }, 300);
+                  }, 50);
                 } else {
                   alert('Street View imagery is not available at this location.');
                 }
