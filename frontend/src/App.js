@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import MapViewer from './components/MapViewer';
-import PopularArticlesList from './components/PopularArticlesList';
-import PortfolioOverlay from './components/PortfolioOverlay';
-import CategorySelector from './components/CategorySelector';
-import DraggableWindow from './components/DraggableWindow';
+import Sidebar from './components/Sidebar';
 import AuthModal from './components/AuthModal';
 import SettingsModal from './components/SettingsModal';
+import LogoAnimation from './components/LogoAnimation';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -19,26 +17,155 @@ function App() {
   const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
   const [articles, setArticles] = useState([]);
   const [popularArticles, setPopularArticles] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [financialMode, setFinancialMode] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [portfolioMinimized, setPortfolioMinimized] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [showPortfolio, setShowPortfolio] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
+  const prevAuthenticatedRef = useRef(null);
+  const hasAnimatedStartup = useRef(false);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchNews();
       fetchPopularNews();
     }
-  }, [selectedCategory, isAuthenticated]);
+  }, [isAuthenticated]);
+
+  // Startup animations (only after logo animation completes) - using CSS classes for performance
+  useEffect(() => {
+    if (!authLoading && logoAnimationComplete && !hasAnimatedStartup.current) {
+      hasAnimatedStartup.current = true;
+      
+      // Add animation classes - CSS handles the rest (GPU-accelerated)
+      const header = document.querySelector('.app-header');
+      const content = document.querySelector('.app-content');
+      
+      // Start animations immediately for smooth transition
+      if (header) {
+        header.classList.add('animate-in');
+      }
+      
+      if (content) {
+        // Remove hidden class first, then animate in
+        content.classList.remove('hidden');
+        // Small delay to ensure smooth transition
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            content.classList.add('animate-in');
+          }, 10);
+        });
+      }
+
+      // If authenticated, animate authenticated elements
+      if (isAuthenticated) {
+        setTimeout(() => {
+          const buttons = document.querySelectorAll('.refresh-button, .user-info');
+          buttons.forEach((btn, i) => {
+            setTimeout(() => {
+              btn.classList.add('animate-in');
+            }, i * 30);
+          });
+
+          const sidebar = document.querySelector('.sidebar');
+          const mapContainer = document.querySelector('.map-container');
+          
+          setTimeout(() => {
+            if (sidebar) sidebar.classList.add('animate-in');
+            if (mapContainer) mapContainer.classList.add('animate-in');
+          }, 80);
+        }, 100);
+      }
+    }
+  }, [authLoading, isAuthenticated, logoAnimationComplete]);
+
+  // Login animations - using CSS classes for performance
+  useEffect(() => {
+    if (prevAuthenticatedRef.current === false && isAuthenticated === true) {
+      // User just logged in - use CSS classes for smooth animations
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const header = document.querySelector('.app-header');
+          const headerH1 = document.querySelector('.app-header h1');
+          const content = document.querySelector('.app-content');
+          
+          // Make app-content visible first
+          if (content) {
+            content.classList.remove('hidden');
+            content.classList.add('animate-in');
+          }
+          
+          // Animate header
+          if (header) {
+            header.classList.add('animate-in');
+          }
+          if (headerH1) {
+            headerH1.classList.add('animate-in');
+          }
+
+          // Animate buttons with slight delay
+          setTimeout(() => {
+            const buttons = document.querySelectorAll('.refresh-button, .user-info');
+            buttons.forEach((btn, i) => {
+              setTimeout(() => {
+                btn.classList.add('animate-in');
+              }, i * 30);
+            });
+          }, 50);
+
+          // Animate sidebar and map - wait a bit for them to render
+          setTimeout(() => {
+            const sidebar = document.querySelector('.sidebar');
+            const mapContainer = document.querySelector('.map-container');
+            
+            if (sidebar) sidebar.classList.add('animate-in');
+            if (mapContainer) {
+              setTimeout(() => {
+                mapContainer.classList.add('animate-in');
+              }, 50);
+            }
+          }, 150);
+          
+          // Remove blur with CSS transition
+          if (content) {
+            content.classList.remove('blurred');
+          }
+        }, 100);
+      });
+    }
+    prevAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  // Logout animations - using CSS classes for performance
+  useEffect(() => {
+    if (prevAuthenticatedRef.current === true && isAuthenticated === false) {
+      // User just logged out - use CSS classes
+      const header = document.querySelector('.app-header h1');
+      const buttons = document.querySelectorAll('.refresh-button, .user-info, .sidebar, .map-container');
+      const content = document.querySelector('.app-content');
+      
+      if (header) header.classList.add('animate-out');
+      
+      buttons.forEach((btn, i) => {
+        setTimeout(() => {
+          btn.classList.add('animate-out');
+        }, i * 30);
+      });
+      
+      // Add blur with CSS transition
+      if (content) {
+        setTimeout(() => {
+          content.classList.add('blurred');
+        }, 100);
+      }
+    }
+  }, [isAuthenticated]);
 
   const fetchNews = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/news?category=${selectedCategory}`);
+      const response = await fetch(`${API_BASE_URL}/news?category=all`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -55,7 +182,7 @@ function App() {
 
   const fetchPopularNews = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/news/popular?category=${selectedCategory}`);
+      const response = await fetch(`${API_BASE_URL}/news/popular?category=all`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -69,14 +196,6 @@ function App() {
       }
       setPopularArticles([]);
       setLoading(false);
-    }
-  };
-
-  const handleCategoryChange = (category) => {
-    setSelectedCategory(category);
-    setFinancialMode(category === 'financial');
-    if (category === 'financial') {
-      setShowPortfolio(true);
     }
   };
 
@@ -117,8 +236,15 @@ function App() {
     window.dispatchEvent(new Event('stocksUpdated'));
   };
 
+  const handleLogoAnimationComplete = () => {
+    setLogoAnimationComplete(true);
+  };
+
   return (
     <div className="app">
+      {!logoAnimationComplete && (
+        <LogoAnimation onComplete={handleLogoAnimationComplete} />
+      )}
       {!isAuthenticated && <AuthModal />}
       {isAuthenticated && (
         <SettingsModal 
@@ -128,15 +254,11 @@ function App() {
         />
       )}
       
-      <div className={`app-content ${!isAuthenticated ? 'blurred' : ''}`}>
+      <div className={`app-content ${!isAuthenticated ? 'blurred' : ''} ${!logoAnimationComplete ? 'hidden' : ''}`}>
         <div className="app-header">
           <h1>🌍 Global News Explorer</h1>
           {isAuthenticated && (
             <>
-              <CategorySelector 
-                selectedCategory={selectedCategory}
-                onCategoryChange={handleCategoryChange}
-              />
               <button className="refresh-button" onClick={handleRefreshNews} disabled={loading}>
                 {loading ? 'Refreshing' : '🔄 Refresh News'}
               </button>
@@ -159,67 +281,22 @@ function App() {
         <div className="app-content-inner">
           {isAuthenticated && (
             <>
-          <div className="map-container">
-          <MapViewer 
-            articles={articles}
-            selectedArticle={selectedArticle}
-            onArticleSelect={setSelectedArticle}
-          />
-        </div>
-
-        {showSidebar && (
-          <DraggableWindow
-            title="🔥 Popular Articles"
-            defaultPosition={{ x: 20, y: 80 }}
-            defaultSize={{ width: 420, height: 600 }}
-            minSize={{ width: 350, height: 300 }}
-            onClose={() => setShowSidebar(false)}
-            isMinimized={sidebarMinimized}
-            onMinimize={setSidebarMinimized}
-            className="articles-window"
-          >
-            <PopularArticlesList 
-              articles={popularArticles}
-              onArticleClick={handleArticleClick}
-              selectedArticle={selectedArticle}
-            />
-          </DraggableWindow>
-        )}
-
-        {!showSidebar && (
-          <button 
-            className="window-toggle-button"
-            onClick={() => setShowSidebar(true)}
-            style={{ position: 'absolute', top: '80px', left: '20px', zIndex: 1000 }}
-          >
-            📰 Articles
-          </button>
-        )}
-
-        {financialMode && showPortfolio && (
-          <DraggableWindow
-            title="💼 Your Portfolio"
-            defaultPosition={{ x: typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 420) : 800, y: 80 }}
-            defaultSize={{ width: 380, height: 500 }}
-            minSize={{ width: 320, height: 300 }}
-            onClose={() => setShowPortfolio(false)}
-            isMinimized={portfolioMinimized}
-            onMinimize={setPortfolioMinimized}
-            className="portfolio-window"
-          >
-            <PortfolioOverlay isWindow={true} />
-          </DraggableWindow>
-        )}
-
-        {financialMode && !showPortfolio && (
-          <button 
-            className="window-toggle-button"
-            onClick={() => setShowPortfolio(true)}
-            style={{ position: 'absolute', top: '80px', right: '20px', zIndex: 1000 }}
-          >
-            💼 Portfolio
-          </button>
-        )}
+              <Sidebar
+                popularArticles={popularArticles}
+                onArticleClick={handleArticleClick}
+                selectedArticle={selectedArticle}
+                portfolioMinimized={portfolioMinimized}
+                onPortfolioMinimize={setPortfolioMinimized}
+                articlesMinimized={sidebarMinimized}
+                onArticlesMinimize={setSidebarMinimized}
+              />
+              <div className="map-container">
+                <MapViewer 
+                  articles={articles}
+                  selectedArticle={selectedArticle}
+                  onArticleSelect={setSelectedArticle}
+                />
+              </div>
             </>
           )}
         </div>

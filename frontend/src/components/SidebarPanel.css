@@ -1,0 +1,91 @@
+.sidebar-panel {
+  position: absolute;
+  left: 0 !important;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: top 0.3s ease, height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  cursor: default;
+}
+
+.sidebar-panel.minimized {
+  height: 50px !important;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: default;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.panel-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Inter', sans-serif;
+  pointer-events: none;
+}
+
+.panel-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.panel-control {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.panel-control:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.panel-control.minimize:hover {
+  background: rgba(74, 158, 255, 0.3);
+}
+
+.panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sidebar-panel.minimized .panel-content {
+  display: none;
+}
