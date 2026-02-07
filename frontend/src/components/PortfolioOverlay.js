@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './PortfolioOverlay.css';
 
-const PortfolioOverlay = () => {
+const PortfolioOverlay = ({ isWindow = false }) => {
   const [stocks, setStocks] = useState([]);
   const [newStock, setNewStock] = useState('');
   const [isOpen, setIsOpen] = useState(true);
@@ -64,7 +64,7 @@ const PortfolioOverlay = () => {
     setStocks(stocks.filter(s => s.symbol !== symbol));
   };
 
-  if (!isOpen) {
+  if (!isWindow && !isOpen) {
     return (
       <button className="portfolio-toggle" onClick={() => setIsOpen(true)}>
         💼 Portfolio
@@ -73,11 +73,13 @@ const PortfolioOverlay = () => {
   }
 
   return (
-    <div className="portfolio-overlay">
-      <div className="portfolio-header">
-        <h3>💼 Your Portfolio</h3>
-        <button className="close-button" onClick={() => setIsOpen(false)}>×</button>
-      </div>
+    <div className={`portfolio-overlay ${isWindow ? 'window-mode' : ''}`}>
+      {!isWindow && (
+        <div className="portfolio-header">
+          <h3>💼 Your Portfolio</h3>
+          <button className="close-button" onClick={() => setIsOpen(false)}>×</button>
+        </div>
+      )}
 
       <div className="portfolio-content">
         <div className="add-stock">

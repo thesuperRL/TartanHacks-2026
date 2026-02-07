@@ -4,7 +4,6 @@ import './PopularArticlesList.css';
 const PopularArticlesList = ({ articles, onArticleClick, selectedArticle }) => {
   return (
     <div className="popular-articles-list">
-      <h2>🔥 Popular Articles</h2>
       <p className="subtitle">Click to reveal and explore on map</p>
       
       <div className="articles-container">
