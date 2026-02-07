@@ -74,7 +74,6 @@
 }
 
 .article-card.blurred {
-  filter: blur(8px);
   user-select: none;
   pointer-events: auto;
 }
@@ -184,19 +183,7 @@
 }
 
 .blur-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 10;
-  border-radius: 16px;
+  display: none;
 }
 
 .blur-overlay p {

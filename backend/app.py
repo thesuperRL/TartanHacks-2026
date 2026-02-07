@@ -442,11 +442,18 @@ def predict_article_impact():
         
         # Generate predictions (call async function using asyncio)
         try:
-            predictions = asyncio.run(stock_predictor.predict_article_impact(assets, article))
-        except RuntimeError:
-            # If event loop is already running, use a different approach
-            loop = asyncio.get_event_loop()
-            predictions = loop.run_until_complete(stock_predictor.predict_article_impact(assets, article))
+            # Use a fresh event loop for this request to avoid event loop issues
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                predictions = loop.run_until_complete(stock_predictor.predict_article_impact(assets, article))
+            finally:
+                loop.close()
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Prediction failed: {str(e)}'
+            }), 500
         
         # If AI returned an error object, propagate it
         if isinstance(predictions, dict) and predictions.get('status') == 'error':
@@ -480,7 +487,7 @@ def predict_article_impact():
 
 if __name__ == '__main__':
     # Use port 5001 to avoid conflict with macOS AirPlay Receiver on port 5000
-    port = int(os.getenv('PORT', 5003))
+    port = int(os.getenv('PORT', 5001))
     print(f"Starting backend server on http://localhost:{port}")
     print("CORS enabled for all origins")
     app.run(debug=True, port=port, host='0.0.0.0')

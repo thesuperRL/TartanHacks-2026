@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PopularArticlesList from './PopularArticlesList';
 import PortfolioOverlay from './PortfolioOverlay';
+import PredictionResults from './PredictionResults';
 import './Sidebar.css';
 
 const Sidebar = ({ 
@@ -10,7 +11,11 @@ const Sidebar = ({
   portfolioMinimized,
   onPortfolioMinimize,
   articlesMinimized,
-  onArticlesMinimize
+  onArticlesMinimize,
+  predictions,
+  predictionsLoading,
+  predictionMinimized,
+  onPredictionMinimize
 }) => {
   const [headerHeight, setHeaderHeight] = useState(80);
   const [availableHeight, setAvailableHeight] = useState(window.innerHeight - 80);
@@ -94,6 +99,40 @@ const Sidebar = ({
           </div>
         )}
       </div>
+
+      {/* Predictions Section */}
+      {(predictions || predictionsLoading) && (
+        <div className={`sidebar-section ${predictionMinimized ? 'minimized' : ''}`}>
+          <div 
+            className="sidebar-section-header"
+            onClick={() => onPredictionMinimize(!predictionMinimized)}
+          >
+            <div className="section-title">
+              <span className="section-icon">📊</span>
+              <span>Stock Predictions</span>
+            </div>
+            <button 
+              className="section-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPredictionMinimize(!predictionMinimized);
+              }}
+              title={predictionMinimized ? 'Expand' : 'Minimize'}
+            >
+              {predictionMinimized ? '□' : '−'}
+            </button>
+          </div>
+          {!predictionMinimized && (
+            <div className="sidebar-section-content">
+              <PredictionResults 
+                predictions={predictions}
+                loading={predictionsLoading}
+                article={selectedArticle}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

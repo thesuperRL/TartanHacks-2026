@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json
 from typing import List, Dict, Any
 import asyncio
+import numpy as np
 import yfinance as yf
 from dedalus_labs import AsyncDedalus, DedalusRunner
 
@@ -15,14 +16,34 @@ class StockPredictor:
         """Initialize the stock predictor with API clients"""
         self.weeks_ahead = 8  # Default prediction horizon (next two months)
     
-    def _build_prediction_prompt(self, assets: List[str], article: Dict[str, Any], historical_data: Dict[str, Any]) -> str:
+    def _generate_baseline_predictions(self, weekly_prices: List[float]) -> List[float]:
+        """Generate baseline 8-week predictions using linear regression on historical data."""
+        if not weekly_prices or len(weekly_prices) < 2:
+            last_price = weekly_prices[-1] if weekly_prices else 100.0
+            return [last_price] * self.weeks_ahead
+        
+        x = np.arange(len(weekly_prices))
+        y = np.array(weekly_prices)
+        coeffs = np.polyfit(x, y, 1)
+        poly = np.poly1d(coeffs)
+        
+        last_idx = len(weekly_prices) - 1
+        baseline_predictions = []
+        for week in range(1, self.weeks_ahead + 1):
+            future_idx = last_idx + week
+            predicted_price = float(poly(future_idx))
+            baseline_predictions.append(predicted_price)
+        return baseline_predictions
+    
+    def _build_prediction_prompt(self, assets: List[str], article: Dict[str, Any], historical_data: Dict[str, Any], baseline_predictions: Dict[str, List[float]]) -> str:
         """
-        Build the prompt for AI analysis of article impact on assets.
+        Build the prompt for AI to adjust baseline predictions based on article context.
         
         Args:
             assets: List of stock symbols
             article: Article object with title/content
             historical_data: Historical price data for context
+            baseline_predictions: Statistical baseline 8-week predictions for each asset
         
         Returns:
             Formatted prompt string for AI model
@@ -30,46 +51,53 @@ class StockPredictor:
         article_text = article.get('content', '') or article.get('title', '')
         article_source = article.get('source', 'Unknown')
         
-        # Extract current prices from historical data for context
-        current_prices_info = []
+        # Build baseline prices string for prompt
+        baseline_info = []
         for symbol in assets:
-            hist = historical_data.get(symbol, {})
-            if isinstance(hist, dict) and hist.get('current_price'):
-                current_prices_info.append(f"{symbol}: ${hist['current_price']:.2f}")
-        current_prices_str = "\n".join(current_prices_info) if current_prices_info else "N/A"
+            if symbol in baseline_predictions:
+                prices = baseline_predictions[symbol]
+                prices_str = ", ".join([f"${p:.2f}" for p in prices])
+                baseline_info.append(f"{symbol}: [{prices_str}]")
+        baseline_prices_str = "\n".join(baseline_info) if baseline_info else "N/A"
         
-        prompt = f"""Analyze this news article and predict exact stock prices for the next {self.weeks_ahead} weeks.
+        prompt = f"""You are a financial analyst modeling realistic stock market behavior. I have baseline predictions for the next {self.weeks_ahead} weeks. Your task is to generate REALISTIC, VOLATILE predictions based on the article's impact.
+
+CRITICAL: Generate REALISTIC market data with natural fluctuations and noise. Do NOT output clean, monotone, or linearly increasing sequences. Real markets jump up and down unexpectedly.
 
 ARTICLE: {article.get('title', 'N/A')}
 Source: {article_source}
 Content: {article_text}
 
-CURRENT PRICES:
-{current_prices_str}
+BASELINE PREDICTIONS (8 weeks ahead):
+{baseline_prices_str}
 
 TARGET ASSETS: {', '.join(assets)}
 
-TASK: For each asset DIRECTLY relevant to this article, provide:
-1. Eight future stock prices (absolute prices, not percentages) for weeks 1-8
-2. One sentence explaining why the price will change that way
+INSTRUCTIONS FOR REALISTIC PREDICTIONS:
+1. Start near baseline for week 1 (±2-3% variance for smooth entry)
+2. Add random market noise: week-to-week swings of ±3-8% are normal and expected
+3. Include "reversals" - prices going down then up, or unexpected dips - this is realistic market behavior
+4. Direction should reflect article sentiment (positive article = upward bias, but with volatility; negative = downward bias with volatility)
+5. NO MONOTONE sequences. Every prediction set should have ups AND downs, not just a straight line
+6. Price volatility should vary by week (some quiet weeks, some volatile ones)
+7. Provide ONE concise explanation (1-2 sentences) explaining the overall sentiment-driven direction
 
-Include ONLY stocks significantly affected by the article. Exclude unrelated stocks.
-
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON matching this format:
 {{
-  "predictions": {{
-    "AAPL": {{
-      "future_prices": [150.25, 151.50, 152.75, 154.00, 155.25, 156.50, 157.75, 159.00],
-      "explanation": "Positive market sentiment drives uptick."
-    }},
-    "MSFT": {{
-      "future_prices": [320.10, 321.30, 322.50, 323.70, 324.90, 326.10, 327.30, 328.50],
-      "explanation": "Stable growth trajectory continues."
+    "predictions": {{
+        "AAPL": {{
+            "future_prices": [149.80, 152.15, 150.45, 153.20, 151.90, 154.60, 152.30, 155.75],
+            "explanation": "Strong tech sector momentum with realistic market volatility and pullback opportunities."
+        }}
     }}
-  }}
 }}
 
-Be realistic, concise, and return ONLY the JSON."""
+CRITICAL REMINDERS:
+- Realistic markets are NOT monotone
+- Include meaningful week-to-week variation
+- This MUST look like actual stock price movement, not a smooth trend line
+
+Return ONLY the JSON, no other text."""
         
         return prompt
     
@@ -116,6 +144,17 @@ Be realistic, concise, and return ONLY the JSON."""
                 'status': 'error',
                 'message': f'AI request failed: {str(e)}'
             }
+        finally:
+            # Ensure client cleanup happens in a safe way
+            try:
+                if hasattr(client, 'aclose'):
+                    try:
+                        await client.aclose()
+                    except RuntimeError:
+                        # Event loop might be closing; ignore
+                        pass
+            except Exception:
+                pass
 
         # Helper: find JSON substring with balanced braces/brackets
         def find_balanced_json(s: str) -> str | None:
@@ -330,8 +369,18 @@ Be realistic, concise, and return ONLY the JSON."""
         for symbol in assets:
             historical_data[symbol] = self._fetch_historical_data(symbol, months=12)
         
-        # Build the prompt for AI analysis
-        prompt = self._build_prediction_prompt(assets, article, historical_data)
+        # Generate baseline statistical predictions for each asset
+        baseline_predictions = {}
+        for symbol in assets:
+            hist = historical_data.get(symbol, {})
+            weekly_prices = [h.get('close') for h in hist.get('weekly_series', []) if isinstance(h, dict) and h.get('close')]
+            if weekly_prices:
+                baseline_predictions[symbol] = self._generate_baseline_predictions(weekly_prices)
+            else:
+                baseline_predictions[symbol] = [0.0] * self.weeks_ahead
+        
+        # Build the prompt with baseline predictions for AI adjustment
+        prompt = self._build_prediction_prompt(assets, article, historical_data, baseline_predictions)
         
         # Generate AI predictions using dedalus_labs (async call)
         predictions = await self._generate_predictions_with_ai(prompt)
