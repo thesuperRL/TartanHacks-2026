@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
 from news_scraper import NewsScraper
 from news_processor import NewsProcessor
-from stock_prediction2 import StockPredictor
+from stock_prediction import StockPredictor
 import os
 import asyncio
 import json

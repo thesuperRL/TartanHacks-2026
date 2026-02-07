@@ -30,52 +30,46 @@ class StockPredictor:
         article_text = article.get('content', '') or article.get('title', '')
         article_source = article.get('source', 'Unknown')
         
-        prompt = f"""You are a financial analyst AI. Analyze the following article and predict its impact on the provided assets over the next {self.weeks_ahead} weeks.
+        # Extract current prices from historical data for context
+        current_prices_info = []
+        for symbol in assets:
+            hist = historical_data.get(symbol, {})
+            if isinstance(hist, dict) and hist.get('current_price'):
+                current_prices_info.append(f"{symbol}: ${hist['current_price']:.2f}")
+        current_prices_str = "\n".join(current_prices_info) if current_prices_info else "N/A"
+        
+        prompt = f"""Analyze this news article and predict exact stock prices for the next {self.weeks_ahead} weeks.
 
-ARTICLE:
-Title: {article.get('title', 'N/A')}
+ARTICLE: {article.get('title', 'N/A')}
 Source: {article_source}
 Content: {article_text}
 
+CURRENT PRICES:
+{current_prices_str}
+
 TARGET ASSETS: {', '.join(assets)}
 
-HISTORICAL CONTEXT:
-{json.dumps(historical_data, indent=2)}
+TASK: For each asset DIRECTLY relevant to this article, provide:
+1. Eight future stock prices (absolute prices, not percentages) for weeks 1-8
+2. One sentence explaining why the price will change that way
 
-TASK:
-1. Analyze the article's sentiment and relevance to each asset
-2. ONLY include assets in your response if they have relevance_score >= 0.3 (i.e., only meaningful impact)
-3. For each relevant asset, generate {self.weeks_ahead} weekly data points (Week 1 through Week {self.weeks_ahead})
-4. Each data point should include:
-   - predicted_price_change_percent: Expected percentage change from current price
-   - confidence: Confidence level (0.0 to 1.0)
-   - reasoning: Brief explanation of the prediction
+Include ONLY stocks significantly affected by the article. Exclude unrelated stocks.
 
-Return your response as a JSON object with this structure:
+Return ONLY valid JSON in this format:
 {{
-  "overall_sentiment": "positive/negative/neutral",
-  "article_relevance_summary": "Brief summary of how relevant this article is",
   "predictions": {{
-    "SYMBOL": {{
-      "sentiment_impact": "positive/negative/neutral",
-      "relevance_score": 0.0-1.0,
-      "weekly_predictions": [
-        {{
-          "week": 1,
-          "predicted_price_change_percent": number,
-          "confidence": 0.0-1.0,
-          "reasoning": "string"
-        }},
-        ...
-      ],
-      "summary": "Overall prediction summary for this asset"
+    "AAPL": {{
+      "future_prices": [150.25, 151.50, 152.75, 154.00, 155.25, 156.50, 157.75, 159.00],
+      "explanation": "Positive market sentiment drives uptick."
     }},
-    ...
+    "MSFT": {{
+      "future_prices": [320.10, 321.30, 322.50, 323.70, 324.90, 326.10, 327.30, 328.50],
+      "explanation": "Stable growth trajectory continues."
+    }}
   }}
 }}
 
-IMPORTANT: Only include assets with relevance_score >= 0.3. Exclude assets that have no meaningful connection to the article.
-Be realistic and conservative in your predictions. Consider market volatility and uncertainty."""
+Be realistic, concise, and return ONLY the JSON."""
         
         return prompt
     
@@ -218,11 +212,25 @@ Be realistic and conservative in your predictions. Consider market volatility an
             except Exception:
                 continue
 
-        # Nothing parsed — return raw best-effort content
-        return {'raw': possible_texts[0]}
+        # Nothing parsed — try aggressive extraction
+        # Search all possible_texts for any valid JSON
+        for txt in possible_texts:
+            # Try to extract any {...} or {...} structures
+            import re
+            # Find all potential JSON objects
+            pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+            matches = re.findall(pattern, txt)
+            for match in matches:
+                try:
+                    parsed = json.loads(match)
+                    return parsed
+                except:
+                    pass
+        
+        return {'raw': possible_texts[0] if possible_texts else ''}
 
     
-    def _fetch_historical_data(self, symbol: str, months: int = 5) -> Dict[str, Any]:
+    def _fetch_historical_data(self, symbol: str, months: int = 12) -> Dict[str, Any]:
         """
         Fetch historical stock data for the given symbol.
         
@@ -305,7 +313,7 @@ Be realistic and conservative in your predictions. Consider market volatility an
             article: Article object with at minimum 'content' or 'title' field
         
         Returns:
-            Dictionary with predictions only for relevant assets (relevance_score >= 0.3)
+            Dictionary with predictions only for relevant assets
         """
         # Validate inputs
         if not assets or not isinstance(assets, list):
@@ -317,10 +325,10 @@ Be realistic and conservative in your predictions. Consider market volatility an
         # Normalize asset symbols
         assets = [symbol.upper().strip() for symbol in assets]
         
-        # Fetch historical data for all assets
+        # Fetch historical data for all assets (1 year of weekly data)
         historical_data = {}
         for symbol in assets:
-            historical_data[symbol] = self._fetch_historical_data(symbol)
+            historical_data[symbol] = self._fetch_historical_data(symbol, months=12)
         
         # Build the prompt for AI analysis
         prompt = self._build_prediction_prompt(assets, article, historical_data)
@@ -328,89 +336,50 @@ Be realistic and conservative in your predictions. Consider market volatility an
         # Generate AI predictions using dedalus_labs (async call)
         predictions = await self._generate_predictions_with_ai(prompt)
         
-        # Filter predictions to only include relevant assets (relevance_score >= 0.3)
-        filtered_predictions = {}
-        if 'predictions' in predictions and isinstance(predictions['predictions'], dict):
-            for symbol, pred_data in predictions['predictions'].items():
-                if isinstance(pred_data, dict) and pred_data.get('relevance_score', 0) >= 0.3:
-                    filtered_predictions[symbol] = pred_data
+        # Extract predictions from response (may be nested under 'predictions' key)
+        pred_dict = predictions.get('predictions', {})
+        if not pred_dict and isinstance(predictions, dict) and len(predictions) > 0:
+            # Fallback: if no 'predictions' key, assume entire response is the predictions dict
+            pred_dict = predictions
         
-        # Also filter historical data to only include relevant assets
+        # Keep only assets that have predictions (they're all relevant since AI filtered)
+        filtered_predictions = {}
+        if isinstance(pred_dict, dict):
+            for symbol, pred_data in pred_dict.items():
+                if isinstance(pred_data, dict) and pred_data.get('future_prices'):
+                    filtered_predictions[symbol] = pred_data
+
+        # Filter historical data to only include predicted assets
         filtered_historical = {symbol: historical_data[symbol] for symbol in filtered_predictions.keys() if symbol in historical_data}
 
-        # For each relevant asset, build a combined weekly series (historical weeks + predicted weeks)
+        # For each predicted asset, extract price lists for graphing
         for symbol, pred_data in filtered_predictions.items():
             hist = filtered_historical.get(symbol, {})
             hist_series = hist.get('weekly_series', []) if isinstance(hist, dict) else []
 
-            # Determine base price for predictions
-            base_price = hist.get('current_price') if isinstance(hist, dict) else None
-            if base_price is None and hist_series:
-                base_price = hist_series[-1].get('close')
+            # Get the 8 future prices from predictions
+            future_prices = pred_data.get('future_prices', [])
+            if not isinstance(future_prices, list):
+                future_prices = []
 
-            # Last historical date to anchor future weeks
-            last_hist_date = None
-            if hist_series:
-                try:
-                    last_hist_date = datetime.fromisoformat(hist_series[-1]['date'])
-                except Exception:
-                    try:
-                        last_hist_date = datetime.strptime(hist_series[-1]['date'], "%Y-%m-%d %H:%M:%S")
-                    except Exception:
-                        last_hist_date = datetime.now()
-            else:
-                last_hist_date = datetime.now()
+            # Extract historical prices as a simple list
+            historical_prices = [float(h.get('close', 0)) for h in hist_series if isinstance(h, dict) and h.get('close') is not None]
 
-            predicted_points = []
-            weekly_preds = pred_data.get('weekly_predictions', []) if isinstance(pred_data, dict) else []
-            running_price = float(base_price) if base_price is not None else None
-            for i, wp in enumerate(weekly_preds):
-                pct = wp.get('predicted_price_change_percent') if isinstance(wp, dict) else None
-                try:
-                    pct_val = float(pct)
-                except Exception:
-                    pct_val = 0.0
+            # Attach price lists back to predictions for frontend use (minimal output)
+            filtered_predictions[symbol]['historical_prices'] = historical_prices
+            filtered_predictions[symbol]['predicted_prices'] = [float(p) if p is not None else 0 for p in future_prices]
+            # Remove the original future_prices to avoid duplication
+            filtered_predictions[symbol].pop('future_prices', None)
 
-                if running_price is None:
-                    predicted_price = None
-                else:
-                    predicted_price = running_price * (1.0 + pct_val / 100.0)
-                    running_price = predicted_price
-
-                future_date = last_hist_date + timedelta(weeks=(i + 1))
-                predicted_points.append({
-                    'date': future_date.isoformat(),
-                    'close': float(predicted_price) if predicted_price is not None else None,
-                    'predicted_price_change_percent': pct_val,
-                    'confidence': wp.get('confidence') if isinstance(wp, dict) else None,
-                    'reasoning': wp.get('reasoning') if isinstance(wp, dict) else None,
-                    'source': 'predicted'
-                })
-
-            # Mark historical entries with source
-            combined = []
-            for h in hist_series:
-                entry = dict(h)
-                entry['source'] = 'historical'
-                combined.append(entry)
-
-            combined.extend(predicted_points)
-
-            # Attach combined series back to predictions for frontend use
-            filtered_predictions[symbol]['combined_weekly_series'] = combined
-
-        # Combine historical context with predictions
+        # Build result response with minimal metadata
         result = {
             'article_metadata': {
                 'title': article.get('title', 'N/A'),
                 'source': article.get('source', 'Unknown'),
                 'timestamp': datetime.now().isoformat()
             },
-            'overall_sentiment': predictions.get('overall_sentiment'),
-            'article_relevance_summary': predictions.get('article_relevance_summary'),
             'relevant_assets': list(filtered_predictions.keys()),
             'relevant_assets_count': len(filtered_predictions),
-            'historical_data': filtered_historical,
             'predictions': filtered_predictions
         }
 
