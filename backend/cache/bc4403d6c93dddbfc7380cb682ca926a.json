@@ -1,0 +1,12 @@
+{
+  "source": "marketwatch",
+  "ticker": "A",
+  "url": "https://www.marketwatch.com/investing/stock/aapl",
+  "scraped at": "2026-02-07T12:30:14.390388",
+  "success": true,
+  "data": {
+    "headlines": [],
+    "full_content": "\n",
+    "headline_count": 0
+  }
+}

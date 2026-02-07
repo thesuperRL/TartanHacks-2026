@@ -1,0 +1,12 @@
+{
+  "source": "marketwatch",
+  "ticker": "G",
+  "url": "https://www.marketwatch.com/investing/stock/goog",
+  "scraped at": "2026-02-07T12:29:48.942269",
+  "success": true,
+  "data": {
+    "headlines": [],
+    "full_content": "\n",
+    "headline_count": 0
+  }
+}
