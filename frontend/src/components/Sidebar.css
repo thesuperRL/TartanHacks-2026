@@ -11,6 +11,20 @@
   z-index: 1000;
   overflow-y: auto;
   overflow-x: hidden;
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  will-change: transform, opacity;
+}
+
+.sidebar.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar.animate-out {
+  opacity: 0;
+  transform: translateX(-30px);
 }
 
 .sidebar-section {

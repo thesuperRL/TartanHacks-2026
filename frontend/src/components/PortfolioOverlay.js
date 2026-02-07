@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../config/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -10,6 +10,8 @@ const PortfolioOverlay = ({ isWindow = false }) => {
   const [newStock, setNewStock] = useState('');
   const [isOpen, setIsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [hasAnimated, setHasAnimated] = useState(false);
+  const stocksListRef = useRef(null);
 
   // Load stocks from Firestore
   useEffect(() => {
@@ -57,6 +59,21 @@ const PortfolioOverlay = ({ isWindow = false }) => {
     }
   };
 
+  // Animate stocks flying in from left when loading completes
+  useEffect(() => {
+    if (!loading && stocks.length > 0 && !hasAnimated) {
+      setHasAnimated(true);
+      const stockItems = stocksListRef.current?.querySelectorAll('.stock-item');
+      if (stockItems) {
+        stockItems.forEach((item, index) => {
+          setTimeout(() => {
+            item.classList.add('animate-in');
+          }, index * 100);
+        });
+      }
+    }
+  }, [loading, stocks, hasAnimated]);
+
   // Mock stock price updates (in production, use a real API)
   // Note: Price updates don't trigger Firestore saves to avoid unnecessary writes
   useEffect(() => {
@@ -89,6 +106,15 @@ const PortfolioOverlay = ({ isWindow = false }) => {
       setStocks(newStocks);
       saveStocks(newStocks);
       setNewStock('');
+      
+      // Animate the new stock in
+      setTimeout(() => {
+        const stockItems = stocksListRef.current?.querySelectorAll('.stock-item:not(.animate-in)');
+        if (stockItems && stockItems.length > 0) {
+          const lastItem = stockItems[stockItems.length - 1];
+          lastItem.classList.add('animate-in');
+        }
+      }, 50);
     }
   };
 
@@ -127,27 +153,44 @@ const PortfolioOverlay = ({ isWindow = false }) => {
           <button onClick={handleAddStock}>Add</button>
         </div>
 
-        <div className="stocks-list">
-          {stocks.map((stock) => (
-            <div key={stock.symbol} className="stock-item">
-              <div className="stock-info">
-                <div className="stock-symbol">{stock.symbol}</div>
-                <div className="stock-name">{stock.name}</div>
-              </div>
-              <div className="stock-price">
-                <div className="price">${stock.price || '--'}</div>
-                <div className={`change ${stock.change >= 0 ? 'positive' : 'negative'}`}>
-                  {stock.change >= 0 ? '+' : ''}{stock.change}%
+        <div className="stocks-list" ref={stocksListRef}>
+          {loading ? (
+            // Loading placeholders
+            [1, 2, 3].map((i) => (
+              <div key={`skeleton-${i}`} className="stock-item stock-skeleton">
+                <div className="stock-info">
+                  <div className="stock-symbol skeleton-line" style={{ width: '60px', height: '20px' }}></div>
+                  <div className="stock-name skeleton-line" style={{ width: '120px', height: '14px', marginTop: '8px' }}></div>
                 </div>
+                <div className="stock-price">
+                  <div className="price skeleton-line" style={{ width: '80px', height: '20px', marginBottom: '8px' }}></div>
+                  <div className="change skeleton-line" style={{ width: '60px', height: '16px' }}></div>
+                </div>
+                <div className="remove-stock skeleton-line" style={{ width: '32px', height: '32px', borderRadius: '8px' }}></div>
               </div>
-              <button 
-                className="remove-stock"
-                onClick={() => handleRemoveStock(stock.symbol)}
-              >
-                ×
-              </button>
-            </div>
-          ))}
+            ))
+          ) : (
+            stocks.map((stock) => (
+              <div key={stock.symbol} className="stock-item">
+                <div className="stock-info">
+                  <div className="stock-symbol">{stock.symbol}</div>
+                  <div className="stock-name">{stock.name}</div>
+                </div>
+                <div className="stock-price">
+                  <div className="price">${stock.price || '--'}</div>
+                  <div className={`change ${stock.change >= 0 ? 'positive' : 'negative'}`}>
+                    {stock.change >= 0 ? '+' : ''}{stock.change}%
+                  </div>
+                </div>
+                <button 
+                  className="remove-stock"
+                  onClick={() => handleRemoveStock(stock.symbol)}
+                >
+                  ×
+                </button>
+              </div>
+            ))
+          )}
         </div>
 
         {stocks.length === 0 && (

@@ -35,6 +35,15 @@
   z-index: 1000;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   position: relative;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  will-change: transform, opacity;
+}
+
+.app-header.animate-in {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .app-header::after {
@@ -58,6 +67,18 @@
   font-family: 'Poppins', sans-serif;
   letter-spacing: -0.5px;
   text-shadow: 0 0 30px rgba(74, 158, 255, 0.3);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  will-change: transform, opacity;
+}
+
+.app-header h1.animate-in {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.app-header h1.animate-out {
+  opacity: 0.7;
+  transform: scale(0.98);
 }
 
 .refresh-button {
@@ -74,6 +95,20 @@
   box-shadow: 0 4px 15px rgba(74, 158, 255, 0.4);
   position: relative;
   overflow: hidden;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out, all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, opacity;
+}
+
+.refresh-button.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.refresh-button.animate-out {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .refresh-button::before {
@@ -128,6 +163,20 @@
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  will-change: transform, opacity;
+}
+
+.user-info.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.user-info.animate-out {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .user-name-button {
@@ -181,7 +230,18 @@
   position: relative;
   overflow: hidden;
   z-index: 1;
-  transition: filter 0.3s ease;
+  transition: opacity 0.25s ease-out, filter 0.3s ease;
+  opacity: 0;
+  will-change: opacity, filter;
+}
+
+.app-content.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-content.animate-in {
+  opacity: 1;
 }
 
 .app-content.blurred {
@@ -227,6 +287,20 @@
   overflow: hidden;
   border-radius: 0;
   z-index: 1;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  will-change: transform, opacity;
+}
+
+.map-container.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.map-container.animate-out {
+  opacity: 0;
+  transform: translateX(20px);
 }
 
 .window-toggle-button {

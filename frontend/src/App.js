@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import MapViewer from './components/MapViewer';
 import Sidebar from './components/Sidebar';
 import AuthModal from './components/AuthModal';
 import SettingsModal from './components/SettingsModal';
+import LogoAnimation from './components/LogoAnimation';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -21,11 +22,144 @@ function App() {
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [portfolioMinimized, setPortfolioMinimized] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [logoAnimationComplete, setLogoAnimationComplete] = useState(false);
+  const prevAuthenticatedRef = useRef(null);
+  const hasAnimatedStartup = useRef(false);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchNews();
       fetchPopularNews();
+    }
+  }, [isAuthenticated]);
+
+  // Startup animations (only after logo animation completes) - using CSS classes for performance
+  useEffect(() => {
+    if (!authLoading && logoAnimationComplete && !hasAnimatedStartup.current) {
+      hasAnimatedStartup.current = true;
+      
+      // Add animation classes - CSS handles the rest (GPU-accelerated)
+      const header = document.querySelector('.app-header');
+      const content = document.querySelector('.app-content');
+      
+      // Start animations immediately for smooth transition
+      if (header) {
+        header.classList.add('animate-in');
+      }
+      
+      if (content) {
+        // Remove hidden class first, then animate in
+        content.classList.remove('hidden');
+        // Small delay to ensure smooth transition
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            content.classList.add('animate-in');
+          }, 10);
+        });
+      }
+
+      // If authenticated, animate authenticated elements
+      if (isAuthenticated) {
+        setTimeout(() => {
+          const buttons = document.querySelectorAll('.refresh-button, .user-info');
+          buttons.forEach((btn, i) => {
+            setTimeout(() => {
+              btn.classList.add('animate-in');
+            }, i * 30);
+          });
+
+          const sidebar = document.querySelector('.sidebar');
+          const mapContainer = document.querySelector('.map-container');
+          
+          setTimeout(() => {
+            if (sidebar) sidebar.classList.add('animate-in');
+            if (mapContainer) mapContainer.classList.add('animate-in');
+          }, 80);
+        }, 100);
+      }
+    }
+  }, [authLoading, isAuthenticated, logoAnimationComplete]);
+
+  // Login animations - using CSS classes for performance
+  useEffect(() => {
+    if (prevAuthenticatedRef.current === false && isAuthenticated === true) {
+      // User just logged in - use CSS classes for smooth animations
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const header = document.querySelector('.app-header');
+          const headerH1 = document.querySelector('.app-header h1');
+          const content = document.querySelector('.app-content');
+          
+          // Make app-content visible first
+          if (content) {
+            content.classList.remove('hidden');
+            content.classList.add('animate-in');
+          }
+          
+          // Animate header
+          if (header) {
+            header.classList.add('animate-in');
+          }
+          if (headerH1) {
+            headerH1.classList.add('animate-in');
+          }
+
+          // Animate buttons with slight delay
+          setTimeout(() => {
+            const buttons = document.querySelectorAll('.refresh-button, .user-info');
+            buttons.forEach((btn, i) => {
+              setTimeout(() => {
+                btn.classList.add('animate-in');
+              }, i * 30);
+            });
+          }, 50);
+
+          // Animate sidebar and map - wait a bit for them to render
+          setTimeout(() => {
+            const sidebar = document.querySelector('.sidebar');
+            const mapContainer = document.querySelector('.map-container');
+            
+            if (sidebar) sidebar.classList.add('animate-in');
+            if (mapContainer) {
+              setTimeout(() => {
+                mapContainer.classList.add('animate-in');
+              }, 50);
+            }
+          }, 150);
+          
+          // Remove blur with CSS transition
+          if (content) {
+            content.classList.remove('blurred');
+          }
+        }, 100);
+      });
+    }
+    prevAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  // Logout animations - using CSS classes for performance
+  useEffect(() => {
+    if (prevAuthenticatedRef.current === true && isAuthenticated === false) {
+      // User just logged out - use CSS classes
+      const header = document.querySelector('.app-header h1');
+      const buttons = document.querySelectorAll('.refresh-button, .user-info, .sidebar, .map-container');
+      const content = document.querySelector('.app-content');
+      
+      if (header) header.classList.add('animate-out');
+      
+      buttons.forEach((btn, i) => {
+        setTimeout(() => {
+          btn.classList.add('animate-out');
+        }, i * 30);
+      });
+      
+      // Add blur with CSS transition
+      if (content) {
+        setTimeout(() => {
+          content.classList.add('blurred');
+        }, 100);
+      }
     }
   }, [isAuthenticated]);
 
@@ -102,8 +236,15 @@ function App() {
     window.dispatchEvent(new Event('stocksUpdated'));
   };
 
+  const handleLogoAnimationComplete = () => {
+    setLogoAnimationComplete(true);
+  };
+
   return (
     <div className="app">
+      {!logoAnimationComplete && (
+        <LogoAnimation onComplete={handleLogoAnimationComplete} />
+      )}
       {!isAuthenticated && <AuthModal />}
       {isAuthenticated && (
         <SettingsModal 
@@ -113,7 +254,7 @@ function App() {
         />
       )}
       
-      <div className={`app-content ${!isAuthenticated ? 'blurred' : ''}`}>
+      <div className={`app-content ${!isAuthenticated ? 'blurred' : ''} ${!logoAnimationComplete ? 'hidden' : ''}`}>
         <div className="app-header">
           <h1>🌍 Global News Explorer</h1>
           {isAuthenticated && (

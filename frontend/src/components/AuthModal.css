@@ -11,16 +11,7 @@
   align-items: center;
   justify-content: center;
   z-index: 100000;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  opacity: 0;
 }
 
 .auth-modal {
@@ -33,19 +24,9 @@
   max-width: 440px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  opacity: 0;
+  transform: translateY(-30px) scale(0.9);
 }
 
 .auth-modal-header {
@@ -63,6 +44,8 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-family: 'Poppins', sans-serif;
+  opacity: 0;
+  transform: translateY(-20px);
 }
 
 .auth-modal-header p {
@@ -70,6 +53,8 @@
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
   font-weight: 500;
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .auth-modal-content {
@@ -108,6 +93,8 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-family: 'Inter', sans-serif;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transform: scale(0.9);
 }
 
 .google-signin-button:hover:not(:disabled) {
@@ -136,6 +123,8 @@
   margin: 24px 0;
   color: rgba(255, 255, 255, 0.4);
   font-size: 14px;
+  opacity: 0;
+  transform: scale(0.8);
 }
 
 .auth-divider::before,
@@ -159,6 +148,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  opacity: 0;
+  transform: translateX(-20px);
 }
 
 .form-group label {
@@ -220,6 +211,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transform: translateY(20px);
 }
 
 .auth-submit-button:hover:not(:disabled) {
@@ -242,6 +235,8 @@
   text-align: center;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transform: translateY(20px);
 }
 
 .auth-link {
