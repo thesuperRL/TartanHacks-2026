@@ -1,4 +1,4 @@
-# Global News Explorer
+# Survey
 
 An interactive news viewer that allows users to explore news articles from around the world through an immersive map interface with street view integration.
 

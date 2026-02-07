@@ -188,7 +188,7 @@ const AuthModal = () => {
       <div className="auth-modal">
         <div className="auth-modal-header">
           <h2>{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-          <p>{isLogin ? 'Sign in to explore global news' : 'Sign up to get started'}</p>
+          <p>{isLogin ? 'Sign in to Survey' : 'Sign up to get started'}</p>
         </div>
 
         <div className="auth-modal-content">

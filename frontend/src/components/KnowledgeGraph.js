@@ -135,28 +135,72 @@ const KnowledgeGraph = ({ portfolio, stocks }) => {
         setError(null);
 
         try {
-            const stockSymbols = stocks?.map(s => s.symbol) || [];
+            // Extract stock symbols from stocks array (handle both object and string formats)
+            const stockSymbols = [];
+            if (stocks && Array.isArray(stocks)) {
+                stocks.forEach(s => {
+                    if (typeof s === 'string') {
+                        stockSymbols.push(s);
+                    } else if (s && s.symbol) {
+                        stockSymbols.push(s.symbol);
+                    }
+                });
+            }
+            
+            // Also check portfolio if it has stocks
+            if (portfolio && Array.isArray(portfolio)) {
+                portfolio.forEach(s => {
+                    if (typeof s === 'string' && !stockSymbols.includes(s)) {
+                        stockSymbols.push(s);
+                    } else if (s && s.symbol && !stockSymbols.includes(s.symbol)) {
+                        stockSymbols.push(s.symbol);
+                    }
+                });
+            }
+
+            console.log('Sending request with stocks:', stockSymbols);
 
             const response = await fetch(`${API_BASE_URL}/knowledge-graph`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    article_url: articleUrl,
+                    article_url: articleUrl.trim(),
                     portfolio_stocks: stockSymbols,
                 }),
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: 'Failed to analyze article' }));
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { message: errorText || `HTTP error! status: ${response.status}` };
+                }
+                throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('Knowledge graph data:', data);
-            setGraphData(data);
+            console.log('Knowledge graph data received:', data);
+            
+            // Validate and set graph data
+            if (data.status === 'error') {
+                throw new Error(data.message || 'Failed to generate knowledge graph');
+            }
+            
+            // Ensure data has the expected structure
+            const graphData = {
+                article: data.article || { title: 'Article', summary: '' },
+                events: data.events || [],
+                impacts: data.impacts || [],
+                reasoning: data.reasoning || []
+            };
+            
+            setGraphData(graphData);
+            setError(null);
         } catch (err) {
             console.error('Error generating knowledge graph:', err);
-            setError(err.message || 'Failed to generate knowledge graph');
+            setError(err.message || 'Failed to generate knowledge graph. Please check the article URL and try again.');
         } finally {
             setLoading(false);
         }

@@ -7,9 +7,9 @@ import DailyDigestVideo from './DailyDigestVideo';
 import LesserKnownCompanies from './LesserKnownCompanies';
 import './Sidebar.css';
 
-const Sidebar = ({ 
-  popularArticles, 
-  onArticleClick, 
+const Sidebar = ({
+  popularArticles,
+  onArticleClick,
   selectedArticle,
   portfolioMinimized,
   onPortfolioMinimize,
@@ -55,7 +55,7 @@ const Sidebar = ({
     <>
       {/* Important Articles Section */}
       <div className={`sidebar-section ${importantArticlesMinimized ? 'minimized' : ''}`}>
-        <div 
+        <div
           className="sidebar-section-header"
           onClick={() => setImportantArticlesMinimized(!importantArticlesMinimized)}
         >
@@ -63,7 +63,7 @@ const Sidebar = ({
             <span className="section-icon">⚠️</span>
             <span>Important Articles</span>
           </div>
-          <button 
+          <button
             className="section-toggle"
             onClick={(e) => {
               e.stopPropagation();
@@ -75,7 +75,7 @@ const Sidebar = ({
           </button>
         </div>
         <div className={`sidebar-section-content ${importantArticlesMinimized ? 'minimized' : ''}`}>
-          <ImportantArticlesList 
+          <ImportantArticlesList
             articles={popularArticles}
             stocks={stocks}
             portfolio={portfolio}
@@ -87,7 +87,7 @@ const Sidebar = ({
 
       {/* Daily Digest Video Section */}
       <div className={`sidebar-section ${dailyDigestMinimized ? 'minimized' : ''}`}>
-        <div 
+        <div
           className="sidebar-section-header"
           onClick={() => setDailyDigestMinimized(!dailyDigestMinimized)}
         >
@@ -95,7 +95,7 @@ const Sidebar = ({
             <span className="section-icon">📹</span>
             <span>Daily Digest</span>
           </div>
-          <button 
+          <button
             className="section-toggle"
             onClick={(e) => {
               e.stopPropagation();
@@ -106,8 +106,25 @@ const Sidebar = ({
             {dailyDigestMinimized ? '□' : '−'}
           </button>
         </div>
-        <div className={`sidebar-section-content ${dailyDigestMinimized ? 'minimized' : ''}`}>
-          <DailyDigestVideo 
+        <div className={`sidebar-section-content ${articlesMinimized ? 'minimized' : ''}`}>
+          <ArticlesList
+            articles={popularArticles}
+            onArticleClick={onArticleClick}
+            selectedArticle={selectedArticle}
+          />
+        </div>
+      </div>
+
+      {/* Daily Digest Video Section */}
+      <div className={`sidebar-section ${false ? 'minimized' : ''}`}>
+        <div className="sidebar-section-header">
+          <div className="section-title">
+            <span className="section-icon">📹</span>
+            <span>Daily Digest</span>
+          </div>
+        </div>
+        <div className="sidebar-section-content">
+          <DailyDigestVideo
             portfolio={portfolio}
             stocks={stocks}
             predictions={predictions}
@@ -117,7 +134,7 @@ const Sidebar = ({
 
       {/* Portfolio Section */}
       <div className={`sidebar-section ${portfolioMinimized ? 'minimized' : ''}`}>
-        <div 
+        <div
           className="sidebar-section-header"
           onClick={() => onPortfolioMinimize(!portfolioMinimized)}
         >
@@ -125,7 +142,7 @@ const Sidebar = ({
             <span className="section-icon">💼</span>
             <span>Your Portfolio</span>
           </div>
-          <button 
+          <button
             className="section-toggle"
             onClick={(e) => {
               e.stopPropagation();
@@ -144,7 +161,7 @@ const Sidebar = ({
       {/* Predictions Section - Only in economic mode */}
       {(predictions || predictionsLoading) && (
         <div className={`sidebar-section ${predictionMinimized ? 'minimized' : ''}`}>
-          <div 
+          <div
             className="sidebar-section-header"
             onClick={() => onPredictionMinimize(!predictionMinimized)}
           >
@@ -152,7 +169,7 @@ const Sidebar = ({
               <span className="section-icon">📊</span>
               <span>Stock Predictions</span>
             </div>
-            <button 
+            <button
               className="section-toggle"
               onClick={(e) => {
                 e.stopPropagation();
@@ -164,7 +181,7 @@ const Sidebar = ({
             </button>
           </div>
           <div className={`sidebar-section-content ${predictionMinimized ? 'minimized' : ''}`}>
-            <PredictionResults 
+            <PredictionResults
               predictions={predictions}
               loading={predictionsLoading}
               article={selectedArticle}
