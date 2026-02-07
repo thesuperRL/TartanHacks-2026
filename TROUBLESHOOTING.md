@@ -11,24 +11,26 @@
 - Start the backend with: `./start-backend.sh` or `cd backend && python app.py`
 - The CORS configuration should allow requests from `http://localhost:3000`
 
-### 2. Google Maps API Key Error
-**Error**: `Google Maps JavaScript API error: InvalidKeyMapError` or `Google Maps API key not configured`
+### 2. Mapbox Access Token Error
+**Error**: `Mapbox access token not configured` or `Mapbox GL JS failed to load`
 
 **Solution**:
-1. Get a Google Maps API key from [Google Cloud Console](https://console.cloud.google.com/google/maps-apis)
-2. Enable the following APIs:
-   - Maps JavaScript API
-   - Street View Static API (optional, for street view)
+1. Get a free Mapbox access token from [Mapbox Account](https://account.mapbox.com/access-tokens/)
+2. Create a free account if you don't have one (free tier includes 50,000 map loads per month)
 3. Create or edit `frontend/.env` file and add:
    ```
-   REACT_APP_GOOGLE_MAPS_API_KEY=your_actual_api_key_here
+   REACT_APP_MAPBOX_ACCESS_TOKEN=your_actual_access_token_here
    ```
 4. Restart the frontend server (React needs to be restarted for .env changes to take effect)
 
-### 3. Street View Library Error
-**Error**: `The library streetview is unknown`
+### 3. Map Not Loading
+**Error**: Map container shows error message or blank screen
 
-**Solution**: This has been fixed! Street View is built into the Maps API and doesn't need to be loaded as a separate library.
+**Solution**: 
+- Verify your Mapbox access token is correct in `frontend/.env`
+- Check browser console for specific error messages
+- Make sure the token has not expired or been revoked
+- Ensure you have internet connection (Mapbox loads tiles from their CDN)
 
 ### 4. Backend Not Running
 **Error**: `Failed to fetch` or connection errors
@@ -62,7 +64,7 @@ Note: The app will work without OpenAI, but location detection will be less accu
 - [ ] Frontend dependencies installed (`cd frontend && npm install`)
 - [ ] Backend server running (`./start-backend.sh`)
 - [ ] Frontend server running (`./start-frontend.sh`)
-- [ ] Google Maps API key added to `frontend/.env` as `REACT_APP_GOOGLE_MAPS_API_KEY`
+- [ ] Mapbox access token added to `frontend/.env` as `REACT_APP_MAPBOX_ACCESS_TOKEN`
 - [ ] (Optional) OpenAI API key added to `backend/.env` as `OPENAI_API_KEY`
 
 ## Testing the Setup

@@ -13,7 +13,7 @@ fi
 if [ ! -f ".env" ]; then
     echo "Warning: .env file not found. Creating from template..."
     echo "REACT_APP_API_URL=http://localhost:5001/api" > .env
-    echo "REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here" >> .env
+    echo "REACT_APP_MAPBOX_ACCESS_TOKEN=your_mapbox_access_token_here" >> .env
     echo "" >> .env
     echo "# Firebase Configuration (required for authentication)" >> .env
     echo "REACT_APP_FIREBASE_API_KEY=your_firebase_api_key" >> .env

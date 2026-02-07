@@ -1,41 +1,41 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { loadGoogleMaps } from '../utils/loadGoogleMaps';
+import { loadMapbox } from '../utils/loadMapbox';
 import './MapViewer.css';
 
 const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
+  const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
-  const streetViewRef = useRef(null);
-  const [map, setMap] = useState(null);
-  const [streetView, setStreetView] = useState(null);
-  const [isStreetView, setIsStreetView] = useState(false);
-  const [markers, setMarkers] = useState([]);
-  const [googleMaps, setGoogleMaps] = useState(null);
+  const [mapbox, setMapbox] = useState(null);
   const [loadingError, setLoadingError] = useState(null);
-  const [streetViewLoaded, setStreetViewLoaded] = useState(false);
+  const markersRef = useRef([]);
+  const popupRef = useRef(null);
 
-  // Load Google Maps API
+  // Load Mapbox GL JS
   useEffect(() => {
-    console.log('Loading Google Maps API...');
-    loadGoogleMaps()
-      .then((maps) => {
-        console.log('Google Maps API loaded successfully');
-        setGoogleMaps(maps);
+    console.log('Loading Mapbox GL JS...');
+    loadMapbox()
+      .then((mapboxgl) => {
+        console.log('Mapbox GL JS loaded successfully');
+        setMapbox(mapboxgl);
         setLoadingError(null);
       })
       .catch((error) => {
-        console.error('Error loading Google Maps:', error);
+        console.error('Error loading Mapbox:', error);
         setLoadingError(error.message);
-        if (mapRef.current) {
-          mapRef.current.innerHTML = `
+        if (mapContainerRef.current) {
+          mapContainerRef.current.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #2a2a2a; color: #fff; flex-direction: column; padding: 20px; text-align: center;">
-              <h2>⚠️ Google Maps API Key Required</h2>
+              <h2>⚠️ Mapbox Access Token Required</h2>
               <p>${error.message}</p>
               <p style="font-size: 12px; color: #aaa; margin-top: 10px;">
                 Create a .env file in the frontend directory and add:<br/>
-                REACT_APP_GOOGLE_MAPS_API_KEY=your_api_key_here
+                REACT_APP_MAPBOX_ACCESS_TOKEN=your_access_token_here
               </p>
               <p style="font-size: 11px; color: #888; margin-top: 10px;">
-                Current API Key: ${process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Set (but may be invalid)' : 'Not set'}
+                Current Access Token: ${process.env.REACT_APP_MAPBOX_ACCESS_TOKEN ? 'Set (but may be invalid)' : 'Not set'}
+              </p>
+              <p style="font-size: 11px; color: #888; margin-top: 10px;">
+                Get your free access token at: <a href="https://account.mapbox.com/access-tokens/" target="_blank" style="color: #4a9eff;">https://account.mapbox.com/access-tokens/</a>
               </p>
             </div>
           `;
@@ -43,76 +43,23 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       });
   }, []);
 
-  // Expose street view function globally for info window buttons
+  // Initialize map once Mapbox is loaded
   useEffect(() => {
-    if (googleMaps && streetView) {
-      window.enterStreetView = (lat, lng) => {
-        const position = { lat, lng };
-        const streetViewService = new googleMaps.StreetViewService();
-        streetViewService.getPanorama({ location: position, radius: 50 }, (data, status) => {
-          if (status === 'OK' && data && data.location) {
-            console.log('Street view available, activating...', data.location);
-            // Use the actual panorama location from the service
-            const panoramaLocation = data.location.latLng;
-            
-            // Ensure container is visible
-            if (streetViewRef.current) {
-              streetViewRef.current.style.display = 'block';
-              streetViewRef.current.style.visibility = 'visible';
-              streetViewRef.current.style.zIndex = '10';
-            }
-            
-            // Reset loaded state
-            setStreetViewLoaded(false);
-            
-            // Set position FIRST, then make visible after a brief delay
-            streetView.setPosition(panoramaLocation);
-            streetView.setPov({ heading: 270, pitch: 0 });
-            
-            // Small delay to ensure position is set before making visible
-            setTimeout(() => {
-              streetView.setVisible(true);
-              setIsStreetView(true);
-              
-              // Trigger resize
-              setTimeout(() => {
-                if (window.google && window.google.maps && window.google.maps.event) {
-                  window.google.maps.event.trigger(streetView, 'resize');
-                }
-              }, 300);
-            }, 50);
-          } else {
-            console.log('Street view not available at this location:', status);
-            alert('Street View imagery is not available at this location. Try clicking on a road or street.');
-          }
-        });
-      };
-    }
-    return () => {
-      delete window.enterStreetView;
-    };
-  }, [googleMaps, streetView]);
-
-  // Initialize map once Google Maps is loaded
-  useEffect(() => {
-    if (!googleMaps || !mapRef.current) {
-      if (!googleMaps) console.log('Waiting for Google Maps to load...');
-      if (!mapRef.current) console.log('Waiting for map container...');
+    if (!mapbox || !mapContainerRef.current || mapRef.current) {
+      if (!mapbox) console.log('Waiting for Mapbox to load...');
+      if (!mapContainerRef.current) console.log('Waiting for map container...');
+      if (mapRef.current) console.log('Map already initialized');
       return;
     }
 
-    console.log('Initializing Google Map...');
+    console.log('Initializing Mapbox map...');
     
     // Ensure map container has dimensions
-    const container = mapRef.current;
+    const container = mapContainerRef.current;
     const parent = container.parentElement;
     
     if (container.offsetWidth === 0 || container.offsetHeight === 0) {
       console.warn('Map container has no dimensions');
-      console.log('Container:', container.offsetWidth, 'x', container.offsetHeight);
-      console.log('Parent:', parent?.offsetWidth, 'x', parent?.offsetHeight);
-      
-      // Force dimensions from parent
       if (parent) {
         const parentWidth = parent.offsetWidth || parent.clientWidth || window.innerWidth;
         const parentHeight = parent.offsetHeight || parent.clientHeight || window.innerHeight;
@@ -128,430 +75,154 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
 
     try {
       // Initialize map
-      const mapInstance = new googleMaps.Map(mapRef.current, {
-      center: { lat: 20, lng: 0 },
-      zoom: 2,
-      // Use default map style - custom dark styles were hiding map tiles
-      // If you want dark mode, use mapTypeId: 'satellite' or apply styles more carefully
-    });
+      const mapInstance = new mapbox.Map({
+        container: mapContainerRef.current,
+        style: 'mapbox://styles/mapbox/dark-v11', // Dark theme
+        center: [0, 20], // [lng, lat]
+        zoom: 2,
+        attributionControl: true
+      });
 
       console.log('Map initialized successfully');
-      console.log('Map container dimensions:', mapRef.current.offsetWidth, 'x', mapRef.current.offsetHeight);
       
-      // Ensure street view container has dimensions before initializing
-      if (!streetViewRef.current) {
-        console.error('Street view container ref is null');
-        return;
-      }
-      
-      const svContainer = streetViewRef.current;
-      const parent = svContainer.parentElement;
-      if (parent) {
-        const parentWidth = parent.offsetWidth || parent.clientWidth || window.innerWidth;
-        const parentHeight = parent.offsetHeight || parent.clientHeight || window.innerHeight;
-        svContainer.style.width = `${parentWidth}px`;
-        svContainer.style.height = `${parentHeight}px`;
-        svContainer.style.minHeight = '400px';
-        svContainer.style.position = 'absolute';
-        svContainer.style.top = '0';
-        svContainer.style.left = '0';
-        console.log('Street view container dimensions:', parentWidth, 'x', parentHeight);
-      }
-      
-      // Initialize street view with no initial position (will be set when activated)
-      const streetViewInstance = new googleMaps.StreetViewPanorama(streetViewRef.current, {
-        visible: false,
-        enableCloseButton: false, // We'll handle exit with our own button
-        addressControl: false,
-        linksControl: true, // Enable navigation links
-        panControl: true, // Enable pan controls
-        zoomControl: true, // Enable zoom controls
-        fullscreenControl: false, // We'll handle fullscreen ourselves if needed
-        scrollwheel: true, // Enable mouse wheel zoom
-        clickToGo: true, // Enable clicking on arrows to navigate
-        disableDefaultUI: false // Keep default UI for navigation
-      });
-      
-      console.log('Street view initialized on container:', streetViewRef.current);
+      mapRef.current = mapInstance;
 
-      setMap(mapInstance);
-      setStreetView(streetViewInstance);
-      
-      // Link street view to map
-      mapInstance.setStreetView(streetViewInstance);
-      
-      // Trigger street view resize after initialization
-      setTimeout(() => {
-        if (streetViewInstance && window.google && window.google.maps && window.google.maps.event) {
-          window.google.maps.event.trigger(streetViewInstance, 'resize');
-          console.log('Street view resize triggered');
-        }
-      }, 200);
-      
-      // Trigger a resize event to ensure map renders properly
-      const triggerResize = () => {
-        if (window.google && window.google.maps && window.google.maps.event && mapInstance) {
-          window.google.maps.event.trigger(mapInstance, 'resize');
-          console.log('Map resize triggered');
+      // Handle map load
+      mapInstance.on('load', () => {
+        console.log('Map loaded');
+      });
+
+      // Handle resize
+      const resizeHandler = () => {
+        if (mapInstance) {
+          mapInstance.resize();
         }
       };
-      
-      // Trigger resize after a short delay to ensure DOM is ready
-      setTimeout(triggerResize, 100);
-      setTimeout(triggerResize, 500);
-      
-      // Also trigger on window resize
-      const resizeHandler = () => triggerResize();
       window.addEventListener('resize', resizeHandler);
 
-    // Add double-click to enter street view
-    const dblclickListener = mapInstance.addListener('dblclick', (e) => {
-      const position = e.latLng;
-      console.log('Double-click detected at:', position.lat(), position.lng());
-      
-      // Check if street view is available at this location
-      const streetViewService = new googleMaps.StreetViewService();
-      streetViewService.getPanorama({ location: position, radius: 50 }, (data, status) => {
-        if (status === 'OK' && data && data.location) {
-          console.log('Street view available, activating...', data.location);
-          
-          // Use the actual panorama location from the service
-          const panoramaLocation = data.location.latLng;
-          
-          // Ensure container is visible and sized
-          if (streetViewRef.current) {
-            streetViewRef.current.style.display = 'block';
-            streetViewRef.current.style.visibility = 'visible';
-            streetViewRef.current.style.zIndex = '10';
-          }
-          
-          // Reset loaded state when entering new street view
-          setStreetViewLoaded(false);
-          
-          // Set position FIRST, then make visible after a brief delay to ensure position is set
-          streetViewInstance.setPosition(panoramaLocation);
-          streetViewInstance.setPov({ heading: 270, pitch: 0 });
-          
-          // Small delay to ensure position is set before making visible
-          setTimeout(() => {
-            streetViewInstance.setVisible(true);
-            setIsStreetView(true);
-            
-            // Also check loaded state after making visible (fallback)
-            setTimeout(() => {
-              if (isMounted) {
-                const panoId = streetViewInstance.getPano();
-                const status = streetViewInstance.getStatus();
-                const isVisible = streetViewInstance.getVisible();
-                console.log('Fallback check after activation:', { panoId, status, isVisible });
-                if (panoId && status === 'OK' && isVisible) {
-                  setTimeout(() => {
-                    if (isMounted && streetViewInstance.getVisible() && streetViewInstance.getPano()) {
-                      console.log('Setting street view as loaded (fallback)');
-                      setStreetViewLoaded(true);
-                    }
-                  }, 1500);
-                }
-              }
-            }, 500);
-            
-            // Wait a bit then trigger resize to ensure street view renders
-            setTimeout(() => {
-              if (window.google && window.google.maps && window.google.maps.event) {
-                window.google.maps.event.trigger(streetViewInstance, 'resize');
-                console.log('Street view resize triggered after activation');
-              }
-            }, 300);
-          }, 50);
-        } else {
-          console.log('Street view not available at this location:', status);
-          alert('Street View imagery is not available at this location. Try clicking on a road or street.');
-        }
-      });
-    });
-    
-    // Listen for street view errors
-    const errorListener = streetViewInstance.addListener('error', (error) => {
-      try {
-        console.error('Street view error:', error);
-        if (error === 'ZERO_RESULTS' || error === 'NOT_FOUND') {
-          if (isMounted) {
-            alert('Street View imagery is not available at this location.');
-            streetViewInstance.setVisible(false);
-            setIsStreetView(false);
-          }
-        } else if (error === 'UNKNOWN_ERROR') {
-          console.warn('Street view unknown error - may be rate limiting (429)');
-          // Show a message but don't auto-exit - user can manually exit
-          // The loading overlay will show the issue
-        }
-      } catch (err) {
-        console.error('Error in error listener:', err);
-      }
-    });
-    
-    // Track if component is mounted to avoid setState after unmount
-    let isMounted = true;
-    
-    // Helper function to check and set loaded state
-    const checkAndSetLoaded = () => {
-      if (!isMounted) return;
-      try {
-        const panoId = streetViewInstance.getPano();
-        const status = streetViewInstance.getStatus();
-        const isVisible = streetViewInstance.getVisible();
-        
-        console.log('Checking street view loaded state:', { panoId, status, isVisible });
-        
-        if (panoId && status === 'OK' && isVisible) {
-          // Give it a moment for tiles to actually render
-          setTimeout(() => {
-            if (isMounted && streetViewInstance.getVisible() && streetViewInstance.getPano()) {
-              console.log('Setting street view as loaded');
-              setStreetViewLoaded(true);
-            }
-          }, 1500);
-        }
-      } catch (error) {
-        console.error('Error checking loaded state:', error);
-      }
-    };
-    
-    // Listen for when street view is ready
-    const panoChangedListener = streetViewInstance.addListener('pano_changed', () => {
-      try {
-        const panoId = streetViewInstance.getPano();
-        console.log('Street view panorama changed, pano ID:', panoId);
-        checkAndSetLoaded();
-      } catch (error) {
-        console.error('Error in pano_changed listener:', error);
-      }
-    });
-    
-    // Listen for when street view tiles have loaded
-    const statusChangedListener = streetViewInstance.addListener('status_changed', () => {
-      try {
-        const status = streetViewInstance.getStatus();
-        console.log('Street view status changed:', status);
-        checkAndSetLoaded();
-      } catch (error) {
-        console.error('Error in status_changed listener:', error);
-      }
-    });
-    
-    // Also listen for position changes
-    const positionChangedListener = streetViewInstance.addListener('position_changed', () => {
-      try {
-        console.log('Street view position changed');
-        checkAndSetLoaded();
-      } catch (error) {
-        console.error('Error in position_changed listener:', error);
-      }
-    });
-    
-    // Listen for street view visibility changes
-    const visibleChangedListener = streetViewInstance.addListener('visible_changed', () => {
-      try {
-        if (!isMounted) return;
-        const isVisible = streetViewInstance.getVisible();
-        console.log('Street view visibility changed:', isVisible);
-        setIsStreetView(isVisible);
-        if (!isVisible) {
-          setStreetViewLoaded(false); // Reset when hidden
-        }
-        if (streetViewRef.current) {
-          if (isVisible) {
-            streetViewRef.current.style.display = 'block';
-            streetViewRef.current.style.visibility = 'visible';
-            streetViewRef.current.style.zIndex = '10';
-            // Ensure container has proper dimensions
-            const parent = streetViewRef.current.parentElement;
-            if (parent) {
-              const parentWidth = parent.offsetWidth || parent.clientWidth;
-              const parentHeight = parent.offsetHeight || parent.clientHeight;
-              streetViewRef.current.style.width = `${parentWidth}px`;
-              streetViewRef.current.style.height = `${parentHeight}px`;
-            }
-            // Trigger resize after visibility change
-            setTimeout(() => {
-              if (window.google && window.google.maps && window.google.maps.event && isMounted) {
-                window.google.maps.event.trigger(streetViewInstance, 'resize');
-              }
-            }, 100);
-          } else {
-            streetViewRef.current.style.display = 'none';
-            streetViewRef.current.style.visibility = 'hidden';
-            streetViewRef.current.style.zIndex = '-1';
-          }
-        }
-      } catch (err) {
-        console.error('Error in visible_changed listener:', err);
-      }
-    });
-
+      // Cleanup
       return () => {
-        isMounted = false;
         window.removeEventListener('resize', resizeHandler);
-        if (dblclickListener) {
-          googleMaps.event.removeListener(dblclickListener);
+        if (mapInstance) {
+          mapInstance.remove();
         }
-        if (panoChangedListener) {
-          googleMaps.event.removeListener(panoChangedListener);
-        }
-        if (statusChangedListener) {
-          googleMaps.event.removeListener(statusChangedListener);
-        }
-        if (positionChangedListener) {
-          googleMaps.event.removeListener(positionChangedListener);
-        }
-        if (errorListener) {
-          googleMaps.event.removeListener(errorListener);
-        }
-        if (visibleChangedListener) {
-          googleMaps.event.removeListener(visibleChangedListener);
-        }
+        mapRef.current = null;
       };
     } catch (error) {
       console.error('Error initializing map:', error);
-      if (mapRef.current) {
-        mapRef.current.innerHTML = `
+      if (mapContainerRef.current) {
+        mapContainerRef.current.innerHTML = `
           <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #2a2a2a; color: #fff; flex-direction: column; padding: 20px; text-align: center;">
             <h2>⚠️ Map Initialization Error</h2>
             <p>${error.message}</p>
             <p style="font-size: 12px; color: #aaa; margin-top: 10px;">
-              Please check your Google Maps API key and ensure it's valid.
+              Please check your Mapbox access token and ensure it's valid.
             </p>
           </div>
         `;
       }
     }
-  }, [googleMaps]);
+  }, [mapbox]);
 
+  // Update markers when articles change
   useEffect(() => {
-    if (!map || !googleMaps || !articles.length) return;
+    if (!mapRef.current || !mapbox || !articles.length) {
+      // Clear existing markers
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+      return;
+    }
+
+    const map = mapRef.current;
 
     // Clear existing markers
-    markers.forEach(marker => marker.setMap(null));
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
 
-    const newMarkers = articles.map(article => {
+    // Create markers for each article
+    articles.forEach(article => {
       if (!article.coordinates || !article.coordinates.lat || !article.coordinates.lng) {
-        return null;
+        return;
       }
 
-      const position = {
-        lat: article.coordinates.lat,
-        lng: article.coordinates.lng
-      };
+      const position = [article.coordinates.lng, article.coordinates.lat]; // [lng, lat] for Mapbox
 
-      // Create custom marker icon based on category
-      const iconColor = article.category === 'financial' ? '#4a9eff' : '#ff6b6b';
-      const icon = {
-        path: googleMaps.SymbolPath.CIRCLE,
-        scale: 8,
-        fillColor: iconColor,
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2
-      };
+      // Determine marker color based on category
+      const markerColor = article.category === 'financial' ? '#4a9eff' : '#ff6b6b';
 
-      const marker = new googleMaps.Marker({
-        position: position,
-        map: map,
-        icon: icon,
-        title: article.title,
-        animation: selectedArticle?.id === article.id ? googleMaps.Animation.BOUNCE : null
-      });
+      // Create a custom marker element
+      const el = document.createElement('div');
+      el.className = 'mapbox-marker';
+      el.style.width = '16px';
+      el.style.height = '16px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = markerColor;
+      el.style.border = '2px solid #ffffff';
+      el.style.cursor = 'pointer';
+      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+      
+      // Add animation for selected article
+      if (selectedArticle?.id === article.id) {
+        el.style.animation = 'bounce 1s infinite';
+        el.style.width = '20px';
+        el.style.height = '20px';
+      }
 
-      // Create info window content with street view button
-      const infoContent = document.createElement('div');
-      infoContent.className = 'marker-info';
-      infoContent.innerHTML = `
+      // Create marker
+      const marker = new mapbox.Marker(el)
+        .setLngLat(position)
+        .addTo(map);
+
+      // Create popup content
+      const popupContent = document.createElement('div');
+      popupContent.className = 'marker-info';
+      popupContent.innerHTML = `
         <h3>${article.title}</h3>
         <p>${article.location}</p>
         <p class="category">${article.category}</p>
         <a href="${article.url}" target="_blank">Read more</a>
-        <br/><br/>
-        <button id="street-view-btn-${article.id}" style="padding: 8px 16px; background: #4a9eff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-          Enter Street View
-        </button>
       `;
-      
-      const infoWindow = new googleMaps.InfoWindow({
-        content: infoContent
-      });
+
+      // Create popup
+      const popup = new mapbox.Popup({ offset: 25, closeOnClick: true })
+        .setDOMContent(popupContent);
 
       // Add click listener
-      marker.addListener('click', () => {
+      marker.setPopup(popup);
+      
+      marker.getElement().addEventListener('click', () => {
         onArticleSelect(article);
-        map.setCenter(position);
-        map.setZoom(10);
-        infoWindow.open(map, marker);
-        
-        // Add street view button listener after info window opens
-        setTimeout(() => {
-          const btn = document.getElementById(`street-view-btn-${article.id}`);
-          if (btn && streetView) {
-            btn.onclick = () => {
-              const streetViewService = new googleMaps.StreetViewService();
-              streetViewService.getPanorama({ location: position, radius: 50 }, (data, status) => {
-                if (status === 'OK' && data && data.location) {
-                  console.log('Street view available, activating from marker...', data.location);
-                  
-                  // Use the actual panorama location from the service
-                  const panoramaLocation = data.location.latLng;
-                  
-                  // Ensure container is visible
-                  if (streetViewRef.current) {
-                    streetViewRef.current.style.display = 'block';
-                    streetViewRef.current.style.visibility = 'visible';
-                    streetViewRef.current.style.zIndex = '10';
-                  }
-                  
-                  // Reset loaded state
-                  setStreetViewLoaded(false);
-                  
-                  // Set position FIRST, then make visible after a brief delay
-                  streetView.setPosition(panoramaLocation);
-                  streetView.setPov({ heading: 270, pitch: 0 });
-                  
-                  // Small delay to ensure position is set before making visible
-                  setTimeout(() => {
-                    streetView.setVisible(true);
-                    setIsStreetView(true);
-                    infoWindow.close();
-                    
-                    // Trigger resize
-                    setTimeout(() => {
-                      if (window.google && window.google.maps && window.google.maps.event) {
-                        window.google.maps.event.trigger(streetView, 'resize');
-                      }
-                    }, 300);
-                  }, 50);
-                } else {
-                  alert('Street View imagery is not available at this location.');
-                }
-              });
-            };
-          }
-        }, 100);
+        map.flyTo({
+          center: position,
+          zoom: 10,
+          duration: 1000
+        });
       });
 
-      return marker;
-    }).filter(Boolean);
+      markersRef.current.push(marker);
+    });
 
-    setMarkers(newMarkers);
-
-    // Add markers to street view if available
-    if (streetView && isStreetView) {
-      newMarkers.forEach(marker => {
-        marker.setMap(streetView);
+    // Fit map to show all markers if there are any
+    if (markersRef.current.length > 0) {
+      const bounds = new mapbox.LngLatBounds();
+      markersRef.current.forEach(marker => {
+        bounds.extend(marker.getLngLat());
       });
+      
+      // Only fit bounds if there's more than one marker or if no article is selected
+      if (markersRef.current.length > 1 || !selectedArticle) {
+        map.fitBounds(bounds, {
+          padding: 50,
+          maxZoom: 10
+        });
+      }
     }
-  }, [map, articles, selectedArticle, googleMaps, streetView, isStreetView, onArticleSelect]);
+
+  }, [mapbox, articles, selectedArticle, onArticleSelect]);
 
   return (
     <div className="map-viewer" style={{ width: '100%', height: '100%', position: 'relative', minHeight: '400px' }}>
-      {!googleMaps && !loadingError && (
+      {!mapbox && !loadingError && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -584,8 +255,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
         </div>
       )}
       <div 
-        ref={mapRef} 
-        className="google-map-container" 
+        ref={mapContainerRef} 
+        className="mapbox-map-container" 
         style={{ 
           width: '100%', 
           height: '100%',
@@ -594,114 +265,9 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
           top: 0,
           left: 0,
           zIndex: 2,
-          display: googleMaps ? 'block' : 'none'
+          display: mapbox ? 'block' : 'none'
         }} 
       />
-      <div 
-        ref={streetViewRef} 
-        className="street-view-container" 
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          minHeight: '400px',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          zIndex: isStreetView ? 10 : -1,
-          display: isStreetView ? 'block' : 'none',
-          visibility: isStreetView ? 'visible' : 'hidden',
-          backgroundColor: isStreetView ? '#000' : 'transparent',
-          overflow: 'hidden'
-        }} 
-      />
-      {isStreetView && !streetViewLoaded && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 11,
-          background: 'rgba(0, 0, 0, 0.8)',
-          color: 'white',
-          padding: '20px 30px',
-          borderRadius: '8px',
-          textAlign: 'center',
-          pointerEvents: 'none',
-          maxWidth: '400px'
-        }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: 500 }}>
-            Loading Street View...
-          </p>
-          <p style={{ fontSize: '12px', margin: '0', opacity: 0.9, lineHeight: '1.5' }}>
-            If you see a black screen, Google may be rate-limiting requests (429 error).
-            <br />
-            Wait a few seconds and the imagery should load, or click "Exit Street View" to return to the map.
-          </p>
-        </div>
-      )}
-      {isStreetView && (
-        <>
-          <button 
-            className="exit-street-view"
-            onClick={() => {
-              console.log('Exiting street view via button');
-              if (streetView) {
-                streetView.setVisible(false);
-              }
-              setIsStreetView(false);
-              setStreetViewLoaded(false); // Reset loaded state
-              // Force hide the container
-              if (streetViewRef.current) {
-                streetViewRef.current.style.display = 'none';
-                streetViewRef.current.style.visibility = 'hidden';
-                streetViewRef.current.style.zIndex = '-1';
-              }
-            }}
-            style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              zIndex: 10000,
-              padding: '12px 24px',
-              background: '#4a9eff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500,
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-              pointerEvents: 'auto'
-            }}
-          >
-            Exit Street View
-          </button>
-          {!streetViewLoaded && (
-            <div className="street-view-overlay" style={{
-              position: 'absolute',
-              top: '20px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 9999,
-              background: 'rgba(0, 0, 0, 0.8)',
-              color: 'white',
-              padding: '15px 25px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              pointerEvents: 'none',
-              textAlign: 'center',
-              maxWidth: '500px'
-            }}>
-              <p style={{ margin: '0 0 8px 0', fontWeight: 500 }}>
-                Street View Mode
-              </p>
-              <p style={{ margin: '0', fontSize: '12px', opacity: 0.9 }}>
-                Loading Street View...
-              </p>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 };
