@@ -46,9 +46,9 @@ if [ ! -f ".env" ]; then
 fi
 
 # Run the Flask app
-# Using port 5001 to avoid conflict with macOS AirPlay Receiver on port 5000
+# Using port 5004 to avoid conflict with macOS AirPlay Receiver on port 5000
 echo ""
-echo "Starting backend server on http://localhost:5001"
-echo "Note: Using port 5001 to avoid macOS AirPlay Receiver conflict"
+echo "Starting backend server on http://localhost:5004"
+echo "Note: Using port 5004 to avoid macOS AirPlay Receiver conflict"
 echo ""
 python app.py

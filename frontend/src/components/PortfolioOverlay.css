@@ -179,6 +179,15 @@
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(-50px);
+  will-change: transform, opacity;
+}
+
+.stock-item.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .stock-item:hover {
@@ -258,6 +267,80 @@
   transform: scale(1.1);
 }
 
+.stock-prediction {
+  margin-top: 8px;
+}
+
+.prediction-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+  transition: all 0.2s;
+}
+
+.prediction-badge.positive {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.prediction-badge.negative {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.prediction-badge:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+}
+
+.prediction-details {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.prediction-price {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 6px;
+}
+
+.prediction-explanation {
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.prediction-source {
+  color: rgba(74, 222, 128, 0.8);
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.prediction-chart {
+  margin: 12px 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.prediction-loading {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+  font-style: italic;
+}
+
 .empty-portfolio {
   text-align: center;
   padding: 60px 20px;
@@ -267,6 +350,33 @@
 .empty-portfolio p {
   font-size: 14px;
   font-weight: 500;
+}
+
+/* Loading skeleton styles */
+.stock-skeleton {
+  pointer-events: none;
+  animation: none;
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @media (max-width: 768px) {

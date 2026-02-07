@@ -6,7 +6,7 @@
   display: block;
 }
 
-.google-map-container {
+.mapbox-map-container {
   width: 100% !important;
   height: 100% !important;
   position: absolute !important;
@@ -17,6 +17,159 @@
   border-radius: 0;
 }
 
+.custom-marker-inner {
+  pointer-events: auto !important;
+  transform-origin: center center !important;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 0 4px rgba(255,255,255,1); }
+  50% { box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 0 6px rgba(255,255,255,0.8); }
+}
+
+/* Popup styles */
+.mapboxgl-popup {
+  z-index: 100 !important;
+}
+
+.article-popup .mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74,158,255,0.3);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid rgba(74, 158, 255, 0.3);
+  max-width: 400px !important;
+}
+
+.marker-popup {
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.marker-info {
+  color: #fff;
+  padding: 20px;
+  max-width: 400px;
+  min-width: 280px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  font-family: 'Inter', sans-serif;
+}
+
+.marker-info h3 {
+  margin: 0 0 10px 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.4;
+  background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 50%, #ec4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.marker-info p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+}
+
+.marker-info .category-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  color: white;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-top: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+
+.marker-info .category-badge.financial {
+  background: linear-gradient(135deg, #4a9eff 0%, #3a8eef 100%);
+}
+
+.marker-info .category-badge.political {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ec4899 100%);
+}
+
+.marker-info .category-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+/* Popup buttons */
+.popup-btn {
+  display: inline-block;
+  padding: 8px 14px;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.popup-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  filter: brightness(1.1);
+}
+
+/* Mapbox control styles - dark theme */
+.mapboxgl-ctrl-group {
+  background: rgba(26, 26, 46, 0.95) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 158, 255, 0.2) !important;
+  border: 1px solid rgba(74, 158, 255, 0.2) !important;
+}
+
+.mapboxgl-ctrl-group button {
+  color: #fff !important;
+  transition: all 0.2s !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background: rgba(74, 158, 255, 0.2) !important;
+  color: #4a9eff !important;
+}
+
+.mapboxgl-popup-close-button {
+  color: rgba(255,255,255,0.7) !important;
+  font-size: 22px !important;
+  padding: 6px 10px !important;
+  border-radius: 50% !important;
+  transition: all 0.2s !important;
+}
+
+.mapboxgl-popup-close-button:hover {
+  color: #ff6b6b !important;
+  background: rgba(236, 72, 153, 0.2) !important;
+  transform: scale(1.1);
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: #1a1a2e !important;
+}
+
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+  border-top-color: #1a1a2e !important;
+}
+
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+  border-bottom-color: #1a1a2e !important;
+}
+
 .street-view-container {
   width: 100% !important;
   height: 100% !important;
@@ -24,7 +177,6 @@
   top: 0;
   left: 0;
   z-index: 2;
-  border-radius: 0;
 }
 
 .exit-street-view {
@@ -40,87 +192,11 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 6px 20px rgba(74, 158, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  font-family: 'Inter', sans-serif;
+  box-shadow: 0 6px 20px rgba(74, 158, 255, 0.5);
+  transition: all 0.3s;
 }
 
 .exit-street-view:hover {
   background: linear-gradient(135deg, #5aaeff 0%, #4a9eff 100%);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(74, 158, 255, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.2);
-}
-
-.exit-street-view:active {
-  transform: translateY(0);
-}
-
-.street-view-overlay {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  color: white;
-  padding: 14px 24px;
-  border-radius: 12px;
-  font-size: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.marker-info {
-  color: #333;
-  padding: 16px;
-  max-width: 320px;
-  font-family: 'Inter', sans-serif;
-}
-
-.marker-info h3 {
-  margin: 0 0 10px 0;
-  font-size: 17px;
-  font-weight: 700;
-  color: #1a1a1a;
-  line-height: 1.4;
-}
-
-.marker-info p {
-  margin: 6px 0;
-  font-size: 14px;
-  color: #555;
-}
-
-.marker-info .category {
-  display: inline-block;
-  padding: 6px 12px;
-  background: linear-gradient(135deg, #4a9eff 0%, #3a8eef 100%);
-  color: white;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-top: 8px;
-  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
-}
-
-.marker-info a {
-  display: inline-block;
-  margin-top: 12px;
-  color: #4a9eff;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s;
-  font-size: 13px;
-}
-
-.marker-info a:hover {
-  color: #3a8eef;
-  text-decoration: underline;
-  transform: translateX(2px);
 }

@@ -27,29 +27,22 @@ const PopularArticlesList = ({ articles, onArticleClick, selectedArticle }) => {
               
               <h3 className="article-title">{article.title}</h3>
               
-              {!article.blurred && (
-                <div className="article-details">
-                  <p className="article-summary">{article.summary}</p>
-                  <div className="article-meta">
-                    <span className="source">{article.source}</span>
-                    <a 
-                      href={article.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="read-more"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Read Full Article →
-                    </a>
-                  </div>
+              {/* Always show article details in popular articles section */}
+              <div className="article-details">
+                <p className="article-summary">{article.summary}</p>
+                <div className="article-meta">
+                  <span className="source">{article.source}</span>
+                  <a 
+                    href={article.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="read-more"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Read Full Article →
+                  </a>
                 </div>
-              )}
-              
-              {article.blurred && (
-                <div className="blur-overlay">
-                  <p>Click to reveal</p>
-                </div>
-              )}
+              </div>
             </div>
           ))
         )}

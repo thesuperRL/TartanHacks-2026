@@ -1,0 +1,130 @@
+.gallery-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 12, 41, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.gallery-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gallery-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: linear-gradient(135deg, #FF6B9D 0%, #FF3366 100%);
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(255, 51, 102, 0.4);
+}
+
+.gallery-close:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(255, 51, 102, 0.6);
+}
+
+.gallery-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.gallery-image-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gallery-image {
+  max-width: 80vw;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(74, 158, 255, 0.3);
+}
+
+.gallery-caption {
+  margin-top: 16px;
+  color: #fff;
+  font-size: 16px;
+  text-align: center;
+  opacity: 0.9;
+  background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+}
+
+.gallery-nav {
+  background: linear-gradient(135deg, #4a9eff 0%, #3a8eef 100%);
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(74, 158, 255, 0.4);
+}
+
+.gallery-nav:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(74, 158, 255, 0.6);
+}
+
+.gallery-dots {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.gallery-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gallery-dot:hover {
+  background: rgba(74, 158, 255, 0.6);
+}
+
+.gallery-dot.active {
+  background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 100%);
+  box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+}
+
+.gallery-error {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  padding: 40px;
+}

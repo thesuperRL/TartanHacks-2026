@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { animate } from 'animejs';
 import './AuthModal.css';
 
 const AuthModal = () => {
@@ -11,6 +12,89 @@ const AuthModal = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const hasAnimated = useRef(false);
+
+  // Entrance animations for AuthModal - only run once
+  useEffect(() => {
+    // Prevent re-animation if already animated
+    if (hasAnimated.current) return;
+    
+    // Small delay to ensure logout animations complete and DOM is ready
+    const timeoutId = setTimeout(() => {
+      hasAnimated.current = true;
+      
+      // Animate modal overlay
+      animate('.auth-modal-overlay', {
+        opacity: [0, 1],
+        duration: 400,
+        easing: 'easeOutCubic'
+      });
+
+      // Animate modal itself
+      animate('.auth-modal', {
+        opacity: [0, 1],
+        scale: [0.9, 1],
+        translateY: [-30, 0],
+        duration: 600,
+        easing: 'easeOutElastic(1, .8)',
+        delay: 100
+      });
+
+      // Animate header
+      animate('.auth-modal-header h2', {
+        opacity: [0, 1],
+        translateY: [-20, 0],
+        duration: 600,
+        easing: 'easeOutCubic',
+        delay: 200
+      });
+
+      animate('.auth-modal-header p', {
+        opacity: [0, 1],
+        translateY: [-10, 0],
+        duration: 500,
+        easing: 'easeOutCubic',
+        delay: 350
+      });
+
+      // Animate form elements with stagger
+      setTimeout(() => {
+        animate('.google-signin-button', {
+          opacity: [0, 1],
+          scale: [0.9, 1],
+          duration: 500,
+          easing: 'easeOutCubic',
+          delay: 100
+        });
+
+        animate('.auth-divider', {
+          opacity: [0, 1],
+          scale: [0.8, 1],
+          duration: 400,
+          easing: 'easeOutCubic',
+          delay: 200
+        });
+
+        animate('.form-group', {
+          opacity: [0, 1],
+          translateX: [-20, 0],
+          duration: 500,
+          easing: 'easeOutCubic',
+          delay: (el, i) => 300 + i * 100
+        });
+
+        animate('.auth-submit-button, .auth-switch', {
+          opacity: [0, 1],
+          translateY: [20, 0],
+          duration: 500,
+          easing: 'easeOutCubic',
+          delay: 600
+        });
+      }, 400);
+    }, 300); // Delay to let logout animations complete
+
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   // Check if Firebase is configured
   const isFirebaseConfigured = 

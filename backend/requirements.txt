@@ -6,6 +6,9 @@ openai>=1.12.0
 python-dotenv==1.0.0
 feedparser>=6.0.11
 geopy==2.4.1
+yfinance==1.1.0
+dedalus-labs==0.2.0
+crawl4ai>=0.3.0
 # Optional: newspaper3k (may have compatibility issues with Python 3.13)
 # If installation fails, the app will work without it using RSS feed data only
 # newspaper3k==0.2.8
