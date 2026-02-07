@@ -24,9 +24,6 @@ export const loadMapbox = () => {
       return;
     }
 
-    // Set the access token
-    window.mapboxgl = { accessToken };
-
     // Create loading promise
     window.mapboxLoading = new Promise((resolveLoading, rejectLoading) => {
       // Load Mapbox GL JS CSS
@@ -42,13 +39,16 @@ export const loadMapbox = () => {
       script.defer = true;
 
       script.onload = () => {
-        if (window.mapboxgl && window.mapboxgl.Map) {
-          // Set the access token
-          window.mapboxgl.accessToken = accessToken;
-          resolveLoading(window.mapboxgl);
-        } else {
-          rejectLoading(new Error('Mapbox GL JS failed to load'));
-        }
+        // Wait a bit for the library to fully initialize
+        setTimeout(() => {
+          if (window.mapboxgl && window.mapboxgl.Map) {
+            // Set the access token
+            window.mapboxgl.accessToken = accessToken;
+            resolveLoading(window.mapboxgl);
+          } else {
+            rejectLoading(new Error('Mapbox GL JS failed to load - Map constructor not found'));
+          }
+        }, 100);
       };
 
       script.onerror = () => {

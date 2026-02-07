@@ -74,10 +74,17 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
     }
 
     try {
-      // Initialize map
-      const mapInstance = new mapbox.Map({
+      // Ensure we're using the correct Mapbox reference
+      const mapboxgl = window.mapboxgl || mapbox;
+      
+      if (!mapboxgl || !mapboxgl.Map) {
+        throw new Error('Mapbox GL JS not properly loaded. Map constructor not available.');
+      }
+      
+      // Initialize map with base dark style, then customize colors
+      const mapInstance = new mapboxgl.Map({
         container: mapContainerRef.current,
-        style: 'mapbox://styles/mapbox/dark-v11', // Dark theme
+        style: 'mapbox://styles/mapbox/dark-v11',
         center: [0, 20], // [lng, lat]
         zoom: 2,
         attributionControl: true
@@ -87,9 +94,157 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       
       mapRef.current = mapInstance;
 
-      // Handle map load
+      // Handle map load - customize colors to match app theme
       mapInstance.on('load', () => {
-        console.log('Map loaded');
+        console.log('Map loaded, applying custom theme colors...');
+        
+        // Apply custom theme colors
+        try {
+          // Debug: Check the 'land' layer specifically
+          const landLayer = mapInstance.getLayer('land');
+          if (landLayer) {
+            console.log('Land layer found:', {
+              id: landLayer.id,
+              type: landLayer.type,
+              paint: landLayer.paint,
+              layout: landLayer.layout
+            });
+          } else {
+            console.warn('Land layer not found!');
+          }
+          
+          // Background color
+          if (mapInstance.getLayer('background')) {
+            mapInstance.setPaintProperty('background', 'background-color', '#0f0c29');
+          }
+          
+          // Water layers - based on actual layer names
+          const waterLayers = ['water', 'waterway'];
+          waterLayers.forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              const layer = mapInstance.getLayer(layerId);
+              try {
+                if (layer.type === 'fill') {
+                  mapInstance.setPaintProperty(layerId, 'fill-color', '#0a0e27');
+                } else if (layer.type === 'line') {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#0a0e27');
+                }
+                console.log(`Applied water color to layer: ${layerId}`);
+              } catch (e) {
+                console.warn(`Could not set color for water layer ${layerId}:`, e);
+              }
+            }
+          });
+          
+          // Land layer - this is the main land fill layer
+          if (mapInstance.getLayer('land')) {
+            try {
+              const landLayer = mapInstance.getLayer('land');
+              console.log('Attempting to color land layer, type:', landLayer.type);
+              
+              // Try fill-color first (most common)
+              try {
+                mapInstance.setPaintProperty('land', 'fill-color', '#302b63');
+                console.log('Set land fill-color');
+              } catch (e) {
+                console.warn('Could not set fill-color:', e.message);
+              }
+              
+              // Try fill-opacity
+              try {
+                mapInstance.setPaintProperty('land', 'fill-opacity', 0.85);
+                console.log('Set land fill-opacity');
+              } catch (e) {
+                console.warn('Could not set fill-opacity:', e.message);
+              }
+              
+              // If it's a background type, try background-color
+              if (landLayer.type === 'background') {
+                try {
+                  mapInstance.setPaintProperty('land', 'background-color', '#302b63');
+                  console.log('Set land background-color');
+                } catch (e) {
+                  console.warn('Could not set background-color:', e.message);
+                }
+              }
+            } catch (e) {
+              console.error('Error coloring land layer:', e);
+            }
+          }
+          
+          // Land colors - other land-related layers
+          const landLayers = ['landuse', 'national-park', 'land-structure-polygon'];
+          landLayers.forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              const layer = mapInstance.getLayer(layerId);
+              try {
+                if (layer.type === 'fill') {
+                  mapInstance.setPaintProperty(layerId, 'fill-color', '#302b63');
+                  mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.85);
+                  console.log(`Applied land color to layer: ${layerId}`);
+                } else if (layer.type === 'line') {
+                  mapInstance.setPaintProperty(layerId, 'line-color', '#302b63');
+                  mapInstance.setPaintProperty(layerId, 'line-opacity', 0.85);
+                  console.log(`Applied land color to line layer: ${layerId}`);
+                }
+              } catch (e) {
+                console.warn(`Could not set color for land layer ${layerId}:`, e);
+              }
+            }
+          });
+          
+          // National parks - slightly different color
+          if (mapInstance.getLayer('national-park')) {
+            try {
+              const parkLayer = mapInstance.getLayer('national-park');
+              if (parkLayer.type === 'fill') {
+                mapInstance.setPaintProperty('national-park', 'fill-color', '#24243e');
+                mapInstance.setPaintProperty('national-park', 'fill-opacity', 0.8);
+                console.log('Applied park color');
+              }
+            } catch (e) {
+              console.warn('Could not set park color:', e);
+            }
+          }
+          
+          // Buildings
+          const buildingLayers = ['building', 'building-extrusion'];
+          buildingLayers.forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              mapInstance.setPaintProperty(layerId, 'fill-color', '#8b5cf6');
+              mapInstance.setPaintProperty(layerId, 'fill-opacity', 0.3);
+            }
+          });
+          
+          // Boundaries - use blue and purple accents
+          const boundaryLayers = ['admin-0-boundary', 'admin-1-boundary', 'admin-0-boundary-bg'];
+          boundaryLayers.forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              const isCountry = layerId.includes('admin-0');
+              mapInstance.setPaintProperty(layerId, 'line-color', isCountry ? '#4a9eff' : '#8b5cf6');
+              mapInstance.setPaintProperty(layerId, 'line-opacity', isCountry ? 0.4 : 0.25);
+            }
+          });
+          
+          // Roads - highways in blue
+          const roadLayers = ['road-street', 'road-primary', 'road-secondary', 'road-highway'];
+          roadLayers.forEach(layerId => {
+            if (mapInstance.getLayer(layerId)) {
+              if (layerId.includes('highway')) {
+                mapInstance.setPaintProperty(layerId, 'line-color', '#4a9eff');
+                mapInstance.setPaintProperty(layerId, 'line-opacity', 0.5);
+              } else {
+                mapInstance.setPaintProperty(layerId, 'line-color', '#1a1a2e');
+                mapInstance.setPaintProperty(layerId, 'line-opacity', 0.3);
+              }
+            }
+          });
+          
+          console.log('Custom theme colors applied');
+        } catch (styleError) {
+          console.warn('Error applying custom colors:', styleError);
+          // Continue even if some layers don't exist
+        }
       });
 
       // Handle resize
@@ -168,8 +323,11 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
         el.style.height = '20px';
       }
 
+      // Get Mapbox reference
+      const mapboxgl = window.mapboxgl || mapbox;
+      
       // Create marker
-      const marker = new mapbox.Marker(el)
+      const marker = new mapboxgl.Marker(el)
         .setLngLat(position)
         .addTo(map);
 
@@ -184,7 +342,7 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
       `;
 
       // Create popup
-      const popup = new mapbox.Popup({ offset: 25, closeOnClick: true })
+      const popup = new mapboxgl.Popup({ offset: 25, closeOnClick: true })
         .setDOMContent(popupContent);
 
       // Add click listener
@@ -204,7 +362,8 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect }) => {
 
     // Fit map to show all markers if there are any
     if (markersRef.current.length > 0) {
-      const bounds = new mapbox.LngLatBounds();
+      const mapboxgl = window.mapboxgl || mapbox;
+      const bounds = new mapboxgl.LngLatBounds();
       markersRef.current.forEach(marker => {
         bounds.extend(marker.getLngLat());
       });
