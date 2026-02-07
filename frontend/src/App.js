@@ -6,6 +6,7 @@ import PortfolioOverlay from './components/PortfolioOverlay';
 import CategorySelector from './components/CategorySelector';
 import DraggableWindow from './components/DraggableWindow';
 import AuthModal from './components/AuthModal';
+import SettingsModal from './components/SettingsModal';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -26,6 +27,7 @@ function App() {
   const [portfolioMinimized, setPortfolioMinimized] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [showPortfolio, setShowPortfolio] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -109,9 +111,22 @@ function App() {
     );
   }
 
+  const handleStocksUpdate = (newStocks) => {
+    // Trigger a re-render of portfolio if it's open
+    // The PortfolioOverlay will pick up the change from the backend
+    window.dispatchEvent(new Event('stocksUpdated'));
+  };
+
   return (
     <div className="app">
       {!isAuthenticated && <AuthModal />}
+      {isAuthenticated && (
+        <SettingsModal 
+          isOpen={showSettings} 
+          onClose={() => setShowSettings(false)}
+          onStocksUpdate={handleStocksUpdate}
+        />
+      )}
       
       <div className={`app-content ${!isAuthenticated ? 'blurred' : ''}`}>
         <div className="app-header">
@@ -126,7 +141,13 @@ function App() {
                 {loading ? 'Refreshing' : '🔄 Refresh News'}
               </button>
               <div className="user-info">
-                <span className="user-name">👤 {user?.name || user?.email}</span>
+                <button 
+                  className="user-name-button" 
+                  onClick={() => setShowSettings(true)}
+                  title="Open settings"
+                >
+                  👤 {user?.name || user?.email}
+                </button>
                 <button className="logout-button" onClick={logout} title="Logout">
                   Logout
                 </button>

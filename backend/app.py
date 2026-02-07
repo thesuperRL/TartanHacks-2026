@@ -29,11 +29,63 @@ processor = NewsProcessor()
 users_db = {}
 tokens_db = {}
 
+# Portfolio storage file
+PORTFOLIOS_FILE = 'portfolios.json'
+
 def generate_token():
     return secrets.token_urlsafe(32)
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
+
+def load_portfolios():
+    """Load portfolios from JSON file"""
+    if os.path.exists(PORTFOLIOS_FILE):
+        try:
+            with open(PORTFOLIOS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading portfolios: {e}")
+            return {}
+    return {}
+
+def save_portfolios(portfolios):
+    """Save portfolios to JSON file"""
+    try:
+        with open(PORTFOLIOS_FILE, 'w') as f:
+            json.dump(portfolios, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving portfolios: {e}")
+        return False
+
+def get_user_from_token():
+    """Extract user from Authorization token"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return None
+    
+    # Token format: "Bearer <token>" or just "<token>"
+    token = auth_header.replace('Bearer ', '') if 'Bearer ' in auth_header else auth_header
+    
+    token_data = tokens_db.get(token)
+    if not token_data:
+        return None
+    
+    # Check if token is expired
+    expires_at = datetime.fromisoformat(token_data['expires_at'])
+    if datetime.now() > expires_at:
+        return None
+    
+    user_id = token_data.get('user_id')
+    email = token_data.get('email')
+    
+    if user_id and email:
+        return {
+            'id': user_id,
+            'email': email
+        }
+    return None
 
 @app.route('/api/news', methods=['GET', 'OPTIONS'])
 @cross_origin()
@@ -250,6 +302,49 @@ def google_auth():
             'token': token
         }), 200
         
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
+@app.route('/api/portfolio', methods=['GET', 'OPTIONS'])
+@cross_origin()
+def get_portfolio():
+    """Get user's portfolio"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    user = get_user_from_token()
+    if not user:
+        return jsonify({'message': 'Unauthorized'}), 401
+    
+    portfolios = load_portfolios()
+    user_portfolio = portfolios.get(user['id'], [])
+    
+    return jsonify({'stocks': user_portfolio}), 200
+
+@app.route('/api/portfolio', methods=['POST', 'PUT', 'OPTIONS'])
+@cross_origin()
+def save_portfolio():
+    """Save user's portfolio"""
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+    
+    user = get_user_from_token()
+    if not user:
+        return jsonify({'message': 'Unauthorized'}), 401
+    
+    try:
+        data = request.get_json()
+        stocks = data.get('stocks', [])
+        
+        # Validate stocks format
+        if not isinstance(stocks, list):
+            return jsonify({'message': 'Invalid stocks format'}), 400
+        
+        portfolios = load_portfolios()
+        portfolios[user['id']] = stocks
+        save_portfolios(portfolios)
+        
+        return jsonify({'message': 'Portfolio saved successfully', 'stocks': stocks}), 200
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 

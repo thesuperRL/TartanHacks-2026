@@ -130,10 +130,23 @@
   margin-left: auto;
 }
 
-.user-name {
+.user-name-button {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s;
+  font-family: 'Inter', sans-serif;
+}
+
+.user-name-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .logout-button {
