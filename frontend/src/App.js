@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from './contexts/AuthContext';
 import MapViewer from './components/MapViewer';
 import PopularArticlesList from './components/PopularArticlesList';
 import PortfolioOverlay from './components/PortfolioOverlay';
 import CategorySelector from './components/CategorySelector';
 import DraggableWindow from './components/DraggableWindow';
+import AuthModal from './components/AuthModal';
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
@@ -13,6 +15,7 @@ console.log('API Base URL:', API_BASE_URL);
 console.log('Google Maps API Key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY ? 'Set' : 'Not set');
 
 function App() {
+  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
   const [articles, setArticles] = useState([]);
   const [popularArticles, setPopularArticles] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -25,9 +28,11 @@ function App() {
   const [showPortfolio, setShowPortfolio] = useState(false);
 
   useEffect(() => {
-    fetchNews();
-    fetchPopularNews();
-  }, [selectedCategory]);
+    if (isAuthenticated) {
+      fetchNews();
+      fetchPopularNews();
+    }
+  }, [selectedCategory, isAuthenticated]);
 
   const fetchNews = async () => {
     try {
@@ -93,21 +98,47 @@ function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="app">
+        <div className="loading-screen">
+          <div className="loading-spinner-large"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
-      <div className="app-header">
-        <h1>🌍 Global News Explorer</h1>
-        <CategorySelector 
-          selectedCategory={selectedCategory}
-          onCategoryChange={handleCategoryChange}
-        />
-        <button className="refresh-button" onClick={handleRefreshNews} disabled={loading}>
-          {loading ? 'Refreshing' : '🔄 Refresh News'}
-        </button>
-      </div>
+      {!isAuthenticated && <AuthModal />}
+      
+      <div className={`app-content ${!isAuthenticated ? 'blurred' : ''}`}>
+        <div className="app-header">
+          <h1>🌍 Global News Explorer</h1>
+          {isAuthenticated && (
+            <>
+              <CategorySelector 
+                selectedCategory={selectedCategory}
+                onCategoryChange={handleCategoryChange}
+              />
+              <button className="refresh-button" onClick={handleRefreshNews} disabled={loading}>
+                {loading ? 'Refreshing' : '🔄 Refresh News'}
+              </button>
+              <div className="user-info">
+                <span className="user-name">👤 {user?.name || user?.email}</span>
+                <button className="logout-button" onClick={logout} title="Logout">
+                  Logout
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
-      <div className="app-content">
-        <div className="map-container">
+        <div className="app-content-inner">
+          {isAuthenticated && (
+            <>
+          <div className="map-container">
           <MapViewer 
             articles={articles}
             selectedArticle={selectedArticle}
@@ -168,6 +199,9 @@ function App() {
             💼 Portfolio
           </button>
         )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
