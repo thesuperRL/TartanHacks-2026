@@ -6,7 +6,7 @@ This guide will help you set up Firebase for authentication and data storage.
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Click "Add project" or select an existing project
-3. Enter a project name (e.g., "Global News Explorer")
+3. Enter a project name (e.g., "Survey")
 4. Follow the setup wizard:
    - Disable Google Analytics (optional, for simplicity)
    - Click "Create project"
@@ -57,7 +57,7 @@ service cloud.firestore {
 3. Scroll down to "Your apps" section
 4. Click the web icon `</>` to add a web app
 5. Register your app:
-   - App nickname: "News Explorer Web"
+   - App nickname: "Survey Web"
    - Check "Also set up Firebase Hosting" (optional)
    - Click "Register app"
 6. **Copy the Firebase configuration object** - it looks like:

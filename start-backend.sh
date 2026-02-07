@@ -7,10 +7,30 @@ cd "$(dirname "$0")/backend"
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
     python3 -m venv venv
+    if [ $? -ne 0 ]; then
+        echo "✗ Error creating virtual environment"
+        exit 1
+    fi
 fi
 
 # Activate virtual environment
 source venv/bin/activate
+
+# Verify activation worked
+if [ -z "$VIRTUAL_ENV" ]; then
+    echo "✗ Error: Virtual environment activation failed"
+    exit 1
+fi
+
+# Determine which Python command to use (venv might have python3, not python)
+if [ -f "venv/bin/python" ]; then
+    PYTHON_CMD="python"
+elif [ -f "venv/bin/python3" ]; then
+    PYTHON_CMD="python3"
+else
+    echo "✗ Error: No Python executable found in venv"
+    exit 1
+fi
 
 # Upgrade pip first
 echo "Upgrading pip..."
@@ -18,7 +38,7 @@ pip install --upgrade pip --quiet
 
 # Check if Flask is installed, if not install all dependencies
 echo "Checking dependencies..."
-if ! python -c "import flask" 2>/dev/null; then
+if ! $PYTHON_CMD -c "import flask" 2>/dev/null; then
     echo "Installing dependencies from requirements.txt..."
     pip install -r requirements.txt --upgrade
     if [ $? -eq 0 ]; then
@@ -41,7 +61,6 @@ fi
 # Check for .env file
 if [ ! -f ".env" ]; then
     echo "Warning: .env file not found. Creating from example..."
-    echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
     echo "Please edit backend/.env and add your OpenAI API key"
 fi
 
@@ -51,4 +70,4 @@ echo ""
 echo "Starting backend server on http://localhost:5004"
 echo "Note: Using port 5004 to avoid macOS AirPlay Receiver conflict"
 echo ""
-python app.py
+$PYTHON_CMD app.py

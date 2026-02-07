@@ -439,6 +439,19 @@ const MapViewer = ({ articles, selectedArticle, onArticleSelect, portfolio = [],
     // Check immediately
     checkVisibility();
     
+    // Listen for map view activation event from App.js
+    const handleMapActivation = () => {
+      setTimeout(() => {
+        checkVisibility();
+      }, 150);
+    };
+    
+    window.addEventListener('map-view-activated', handleMapActivation);
+    
+    return () => {
+      window.removeEventListener('map-view-activated', handleMapActivation);
+    };
+    
     // Also check after a short delay to catch delayed renders
     const timer = setTimeout(checkVisibility, 200);
     

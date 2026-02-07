@@ -174,6 +174,7 @@ function App() {
   const [mapActivePanel, setMapActivePanel] = useState('news'); // 'news' or 'companies'
   const prevAuthenticatedRef = useRef(null);
   const hasAnimatedStartup = useRef(false);
+  const mapContainerRef = useRef(null);
 
   // Load portfolio data
   useEffect(() => {
@@ -251,6 +252,41 @@ function App() {
     setDemoArticles(generateDemoArticles(mode));
     setPopularArticles(getDefaultArticles(mode));
   }, [mode]);
+
+  // Handle map visibility when returning from knowledge graph or portfolio planner
+  useEffect(() => {
+    if (!showKnowledgeGraph && !showPortfolioPlanner && isAuthenticated) {
+      // Map view is active - ensure map container and sidebar are visible and trigger resize
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const mapContainer = document.querySelector('.map-container');
+          const sidebar = document.querySelector('.sidebar');
+          
+          // Ensure map container is visible
+          if (mapContainer) {
+            // Add animate-in class to ensure visibility
+            mapContainer.classList.add('animate-in');
+            mapContainer.classList.remove('animate-out');
+          }
+          
+          // Ensure sidebar is visible
+          if (sidebar) {
+            sidebar.classList.add('animate-in');
+            sidebar.classList.remove('animate-out');
+            // Trigger a resize event to recalculate sidebar dimensions
+            window.dispatchEvent(new Event('resize'));
+          }
+          
+          // Trigger map resize after a short delay to ensure DOM is ready
+          setTimeout(() => {
+            // Dispatch a custom event that MapViewer can listen to
+            window.dispatchEvent(new Event('map-view-activated'));
+          }, 150);
+        });
+      });
+    }
+  }, [showKnowledgeGraph, showPortfolioPlanner, isAuthenticated]);
 
   useEffect(() => {
     // Always initialize with demo articles for the map
@@ -621,7 +657,7 @@ function App() {
 
       <div className={`app-content ${!isAuthenticated ? 'blurred' : ''} ${!logoAnimationComplete ? 'hidden' : ''}`}>
         <div className="app-header">
-          <h1>🌍 Global News Explorer</h1>
+          <h1>Survey</h1>
           {isAuthenticated && (
             <>
               <ModeSelector selectedMode={mode} onModeChange={setMode} />
@@ -671,7 +707,7 @@ function App() {
                 <button
                   className="nav-button"
                   onClick={() => setShowKnowledgeGraph(false)}
-                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
+                  style={{ position: 'fixed', top: '100px', right: '30px', zIndex: 1001, margin: 0 }}
                 >
                   ← Back to Map
                 </button>
@@ -689,7 +725,7 @@ function App() {
                 <button
                   className="nav-button"
                   onClick={() => setShowPortfolioPlanner(false)}
-                  style={{ position: 'sticky', top: '20px', right: '20px', zIndex: 1000, alignSelf: 'flex-end', margin: '20px' }}
+                  style={{ position: 'fixed', top: '100px', right: '30px', zIndex: 1001, margin: 0 }}
                 >
                   ← Back to Map
                 </button>
@@ -716,7 +752,7 @@ function App() {
                   onRemoveStock={handleRemoveStockFromPortfolio}
                   mode={mode}
                 />
-                <div className="map-container">
+                <div className="map-container animate-in" ref={mapContainerRef}>
                   <MapViewer
                     articles={articles}
                     selectedArticle={selectedArticle}

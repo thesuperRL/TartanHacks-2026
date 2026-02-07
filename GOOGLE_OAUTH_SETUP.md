@@ -7,7 +7,7 @@ This guide will help you set up Google OAuth for the authentication system.
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Click on the project dropdown at the top
 3. Click "New Project"
-4. Enter a project name (e.g., "News Explorer")
+4. Enter a project name (e.g., "Survey")
 5. Click "Create"
 
 ## Step 2: Enable Google Identity Services API
@@ -23,7 +23,7 @@ This guide will help you set up Google OAuth for the authentication system.
 3. If prompted, configure the OAuth consent screen first:
    - Choose "External" (unless you have a Google Workspace)
    - Fill in the required fields:
-     - App name: "Global News Explorer"
+     - App name: "Survey"
      - User support email: Your email
      - Developer contact: Your email
    - Click "Save and Continue"
@@ -35,7 +35,7 @@ This guide will help you set up Google OAuth for the authentication system.
 
 4. Back in Credentials, click "Create Credentials" → "OAuth client ID"
 5. Choose "Web application"
-6. Name it (e.g., "News Explorer Web Client")
+6. Name it (e.g., "Survey Web Client")
 7. **IMPORTANT**: Add these Authorized JavaScript origins:
    - `http://localhost:3000`
    - `http://127.0.0.1:3000`
