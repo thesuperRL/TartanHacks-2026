@@ -106,36 +106,6 @@ const Sidebar = ({
             {dailyDigestMinimized ? '□' : '−'}
           </button>
         </div>
-        <div className={`sidebar-section-content ${articlesMinimized ? 'minimized' : ''}`}>
-          <ArticlesList
-            articles={popularArticles}
-            onArticleClick={onArticleClick}
-            selectedArticle={selectedArticle}
-          />
-        </div>
-      </div>
-
-      {/* Daily Digest Video Section */}
-      <div className={`sidebar-section ${dailyDigestMinimized ? 'minimized' : ''}`}>
-        <div
-          className="sidebar-section-header"
-          onClick={() => setDailyDigestMinimized(!dailyDigestMinimized)}
-        >
-          <div className="section-title">
-            <span className="section-icon">📹</span>
-            <span>Daily Digest</span>
-          </div>
-          <button
-            className="section-toggle"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDailyDigestMinimized(!dailyDigestMinimized);
-            }}
-            title={dailyDigestMinimized ? 'Expand' : 'Minimize'}
-          >
-            {dailyDigestMinimized ? '□' : '−'}
-          </button>
-        </div>
         <div className={`sidebar-section-content ${dailyDigestMinimized ? 'minimized' : ''}`}>
           <DailyDigestVideo
             portfolio={portfolio}

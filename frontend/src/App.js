@@ -253,6 +253,51 @@ function App() {
     setPopularArticles(getDefaultArticles(mode));
   }, [mode]);
 
+  // Handle mode change: switch from companies to news when switching to political mode
+  useEffect(() => {
+    if (mode === 'political' && mapActivePanel === 'companies') {
+      // Political mode doesn't support companies view, switch to news
+      // Use a small delay to ensure smooth transition
+      const transitionTimer = setTimeout(() => {
+        setMapActivePanel('news');
+      }, 50);
+      
+      // Trigger smooth transition after panel change
+      const animationTimer = setTimeout(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const mapContainer = document.querySelector('.map-container');
+            const sidebar = document.querySelector('.sidebar');
+            
+            if (mapContainer) {
+              mapContainer.classList.add('animate-in');
+              mapContainer.classList.remove('animate-out');
+            }
+            
+            if (sidebar) {
+              sidebar.classList.add('animate-in');
+              sidebar.classList.remove('animate-out');
+              // Trigger resize to recalculate sidebar dimensions
+              window.dispatchEvent(new Event('resize'));
+            }
+            
+            // Trigger map resize and panel update
+            setTimeout(() => {
+              window.dispatchEvent(new Event('map-view-activated'));
+              // Force a resize event to ensure map updates
+              window.dispatchEvent(new Event('resize'));
+            }, 150);
+          });
+        });
+      }, 200);
+      
+      return () => {
+        clearTimeout(transitionTimer);
+        clearTimeout(animationTimer);
+      };
+    }
+  }, [mode, mapActivePanel]);
+
   // Handle map visibility when returning from knowledge graph or portfolio planner
   useEffect(() => {
     if (!showKnowledgeGraph && !showPortfolioPlanner && isAuthenticated) {
@@ -353,25 +398,72 @@ function App() {
     }
   }, [authLoading, isAuthenticated, logoAnimationComplete]);
 
-  // Re-animate sidebar and map when returning from Knowledge Graph
+  // Handle smooth transitions between views
   useEffect(() => {
-    if (!showKnowledgeGraph && isAuthenticated && hasAnimatedStartup.current) {
-      // Small delay to ensure DOM elements are mounted
-      const timer = setTimeout(() => {
-        const sidebar = document.querySelector('.sidebar');
-        const mapContainer = document.querySelector('.map-container');
+    if (isAuthenticated && hasAnimatedStartup.current) {
+      // When switching to knowledge graph or portfolio planner
+      if (showKnowledgeGraph || showPortfolioPlanner) {
+        // Animate out map view if it exists
+        const mapViewContainer = document.querySelector('.map-view-container');
+        if (mapViewContainer && mapViewContainer.classList.contains('animate-in')) {
+          mapViewContainer.classList.remove('animate-in');
+          mapViewContainer.classList.add('animate-out');
+        }
         
-        if (sidebar && !sidebar.classList.contains('animate-in')) {
-          sidebar.classList.add('animate-in');
+        // Animate out previous view container if switching between views
+        const prevViewContainer = document.querySelector('.view-container.animate-in');
+        if (prevViewContainer) {
+          prevViewContainer.classList.remove('animate-in');
+          prevViewContainer.classList.add('animate-out');
         }
-        if (mapContainer && !mapContainer.classList.contains('animate-in')) {
-          mapContainer.classList.add('animate-in');
+        
+        // Animate in the new view after a short delay
+        setTimeout(() => {
+          const viewContainer = document.querySelector('.view-container');
+          if (viewContainer) {
+            viewContainer.classList.remove('animate-out');
+            viewContainer.classList.add('animate-in');
+          }
+        }, 150);
+      } else {
+        // When returning to map view
+        // Animate out current view
+        const viewContainer = document.querySelector('.view-container');
+        if (viewContainer) {
+          viewContainer.classList.remove('animate-in');
+          viewContainer.classList.add('animate-out');
         }
-      }, 50);
-      
-      return () => clearTimeout(timer);
+        
+        // Animate in map view after a short delay
+        setTimeout(() => {
+          const mapViewContainer = document.querySelector('.map-view-container');
+          const sidebar = document.querySelector('.sidebar');
+          const mapContainer = document.querySelector('.map-container');
+          
+          if (mapViewContainer) {
+            mapViewContainer.classList.remove('animate-out');
+            mapViewContainer.classList.add('animate-in');
+          }
+          
+          if (sidebar) {
+            sidebar.classList.add('animate-in');
+            sidebar.classList.remove('animate-out');
+            window.dispatchEvent(new Event('resize'));
+          }
+          
+          if (mapContainer) {
+            mapContainer.classList.add('animate-in');
+            mapContainer.classList.remove('animate-out');
+          }
+          
+          // Trigger map resize
+          setTimeout(() => {
+            window.dispatchEvent(new Event('map-view-activated'));
+          }, 150);
+        }, 150);
+      }
     }
-  }, [showKnowledgeGraph, isAuthenticated]);
+  }, [showKnowledgeGraph, showPortfolioPlanner, isAuthenticated]);
 
   // Login animations - using CSS classes for performance
   useEffect(() => {
@@ -696,14 +788,18 @@ function App() {
         <div className="app-content-inner">
           {isAuthenticated && (
             showKnowledgeGraph ? (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                overflow: 'auto',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
+              <div 
+                key="knowledge-graph"
+                className="view-container animate-in"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  position: 'relative',
+                  overflow: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
                 <button
                   className="nav-button"
                   onClick={() => setShowKnowledgeGraph(false)}
@@ -714,14 +810,18 @@ function App() {
                 <KnowledgeGraph portfolio={portfolio} stocks={stocks} />
               </div>
             ) : showPortfolioPlanner ? (
-              <div style={{
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                overflow: 'auto',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
+              <div 
+                key="portfolio-planner"
+                className="view-container animate-in"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  position: 'relative',
+                  overflow: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
                 <button
                   className="nav-button"
                   onClick={() => setShowPortfolioPlanner(false)}
@@ -732,7 +832,7 @@ function App() {
                 <PortfolioPlanner />
               </div>
             ) : (
-              <>
+              <div key="map-view" className="map-view-container animate-in">
                 <Sidebar
                   popularArticles={[...popularArticles, ...demoArticles]}
                   onArticleClick={handleArticleClick}
@@ -764,7 +864,7 @@ function App() {
                     onPanelChange={setMapActivePanel}
                   />
                 </div>
-              </>
+              </div>
             )
           )}
         </div>

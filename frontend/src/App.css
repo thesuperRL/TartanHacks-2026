@@ -331,6 +331,57 @@
   position: relative;
 }
 
+/* View transition animations */
+.view-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  will-change: opacity, transform;
+}
+
+.view-container.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.view-container.animate-out {
+  opacity: 0;
+  transform: translateX(-20px);
+  pointer-events: none;
+}
+
+/* Map view transition */
+.map-view-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  will-change: opacity, transform;
+}
+
+.map-view-container.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.map-view-container.animate-out {
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+}
+
 
 .loading-screen {
   display: flex;
